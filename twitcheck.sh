@@ -1,23 +1,8 @@
 #!/bin/bash
 # twitcheck - A twitch.tv Stream Checker by BrowncoatShadow and Crendgrim
-# Useage: Configure settings and add this script to crontab.
+# Useage: Copy settings.default.sh to settings.sh, configure settings and add this script to crontab.
 
-
-# SETTINGS
-
-# Your Twitch user in all lower-case letters.
-USER=
-# Twitch client_id, generate at <http://www.twitch.tv/kraken/oauth2/clients/new>.
-CLIENT=
-# The file to store the stream data returned from the Twitch API in.
-DATAFILE=/tmp/twitch.json
-# A database file to store currently online streams in.
-DBFILE=/tmp/twitch.txt
-# The notification module to use. The order of arguments is $CHANNEL, $GAME, $STATUS, $LINK.
-SENDIT=./kdialognotify.sh
-
-# SETTINGS END
-
+source 'settings.sh'
 
 # Cleanup: If the database file is older than 2 hours, consider it outdated and remove its contents.
 [[ $((`date +%s`-`stat -c %Y $DBFILE`)) -gt 7200 ]] && echo > $DBFILE
