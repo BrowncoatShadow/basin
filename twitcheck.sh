@@ -4,6 +4,13 @@
 
 source $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )'/settings.sh'
 
+# Check if we have a user set
+if [ ! -n "$USER" ]
+then
+	>&2 echo "You have to supply a user to fetch followed channels from!"
+	exit
+fi
+
 # Cleanup: If the database file is older than 2 hours, consider it outdated and remove its contents.
 [[ $((`date +%s`-`stat -c %Y $DBFILE`)) -gt 7200 ]] && echo > $DBFILE
 
