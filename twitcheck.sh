@@ -88,7 +88,7 @@ main() {
 			echo "$1$DEL$sgame$DEL$sstatus" >> $DBFILE
 
 			# Send notification. NOTE This method has not yet been tested, and the variable probably needs to be renamed, but "notify" is already taken.
-			$SENDIT "$schannel" "$sgame" "$sstatus" "$slink"
+			$MODULE "$schannel" "$sgame" "$sstatus" "$slink"
 
 		else
 
