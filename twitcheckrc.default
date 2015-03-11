@@ -10,11 +10,11 @@ FOLLOWLIST=
 # Twitch client_id, generate at <http://www.twitch.tv/kraken/oauth2/clients/new>.
 CLIENT=
 # The file to store the stream data returned from the Twitch API in.
-DATAFILE=/tmp/twitch.json
+DATAFILE=$HOME/.local/share/twitcheck/return.json
 # A database file to store currently online streams in.
-DBFILE=/tmp/twitch.txt
+DBFILE=$HOME/.local/share/twitcheck/online.txt
 # The notification module to use. The order of arguments is $CHANNEL, $GAME, $STATUS, $LINK.
-SENDIT=./kdialognotify.sh
+SENDIT=<INSTALL_DIR>/kdialognotify.sh
 
 # GENERAL SETTINGS END
 

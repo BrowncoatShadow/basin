@@ -2,13 +2,30 @@
 # twitcheck - A twitch.tv Stream Checker by BrowncoatShadow and Crendgrim
 # Useage: Copy settings.default.sh to settings.sh, configure settings and add this script to crontab.
 
-source $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )'/settings.sh'
+# Include settings if they exist; create them from default template first otherwise
+TC_BASEDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+[[ -f "$HOME/.config/twitcheckrc" ]] || sed "s#<INSTALL_DIR>#$TC_BASEDIR#g" "$TC_BASEDIR/twitcheckrc.default" > "$HOME/.config/twitcheckrc"
+
+source $HOME/.config/twitcheckrc
 
 # Check if we have a user set or any channels to follow
 if [[ -z "$USER" && -z "$FOLLOWLIST" ]]
 then
 	>&2 echo "You have to supply a user to fetch followed channels from, or set a FOLLOWLIST in the config!"
+	>&2 echo "The configuration file can be found at $HOME/.config/twitcheckrc"
 	exit
+fi
+
+# Generate folders and files if they do not exist
+if [[ ! -f $DATAFILE ]]
+then
+	mkdir -p $(dirname $DATAFILE)
+	touch $DATAFILE
+fi
+if [[ ! -f $DBFILE ]]
+then
+	mkdir -p $(dirname $DBFILE)
+	touch $DBFILE
 fi
 
 # Cleanup: If the database file is older than 2 hours, consider it outdated and remove its contents.
