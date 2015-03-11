@@ -34,6 +34,7 @@ if [[ -n $1 ]]
 then
 	# Use arguments instead of settings rc file.
 	list=$*
+	MODULE="$TC_BASEDIR/echonotify.sh"
 	unset DBFILE
 else
 	# Check if we have a user set or any channels to follow.
