@@ -83,8 +83,8 @@ main() {
 		then
 
 			# Add streamer to currently streaming DB; remove him first to discard old information (only status/game may have changed).
-			sed -i "/^$1/d" $DBFILE
 			DEL=`printf "\u2008"` # use Unicode 2008 ('PUNCTUATION SPACE') as a delimiter for the database file. This is a key that will not appear in the Twitch status.
+			sed -i "/^$1$DEL/d" $DBFILE
 			echo "$1$DEL$sgame$DEL$sstatus" >> $DBFILE
 
 			# Send notification. NOTE This method has not yet been tested, and the variable probably needs to be renamed, but "notify" is already taken.
@@ -98,7 +98,7 @@ main() {
 		fi
 	else
 		# Remove from steaming DB if exists.
-		sed -i "/^$1/d" $DBFILE
+		sed -i "/^$1$(printf "\u2008")/d" $DBFILE
 	fi
 }
 
