@@ -14,7 +14,7 @@ DATAFILE=$HOME/.local/share/twitcheck/return.json
 # A database file to store currently online streams in.
 DBFILE=$HOME/.local/share/twitcheck/online.txt
 # The notification module to use. The order of arguments is $CHANNEL, $GAME, $STATUS, $LINK.
-SENDIT=<INSTALL_DIR>/kdialognotify.sh
+SENDIT=<INSTALL_DIR>/echonotify.sh
 
 # GENERAL SETTINGS END
 
