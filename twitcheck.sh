@@ -32,9 +32,9 @@ fi
 # Check if script has been called with command-line arguments.
 if [[ -n $1 ]]
 then
-	# Use arguments instead of settings rc file.
+	# Use arguments instead of settings rc file and use the echo module.
 	list=$*
-	MODULE="$TC_BASEDIR/echonotify.sh"
+	MODULE=echo_notify.sh
 	unset DBFILE
 else
 	# Check if we have a user set or any channels to follow.
@@ -105,8 +105,9 @@ main() {
 				echo "$1$DEL$sgame$DEL$sstatus" >> $DBFILE
 			fi
 
-			# Send notification. NOTE This method has not yet been tested, and the variable probably needs to be renamed, but "notify" is already taken.
-			$MODULE "$schannel" "$sgame" "$sstatus" "$slink"
+			# Send notification by using the module and giving it the arguments.
+			push=$MODDIR$MODULE
+			$push "$schannel" "$sgame" "$sstatus" "$slink"
 
 		else
 
