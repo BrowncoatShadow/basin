@@ -34,6 +34,7 @@ if [[ -n $1 ]]
 then
 	# Use arguments instead of settings rc file.
 	list=$*
+	unset DBFILE
 else
 	# Check if we have a user set or any channels to follow.
 	if [[ -z "$USER" && -z "$FOLLOWLIST" ]]
@@ -65,7 +66,7 @@ main() {
 	if [ "$name" == "$1" ]
 	then
 		# Check if it has been active since last check.
-		dbcheck=$(cat $DBFILE | grep "^$1")
+		[[ $DBFILE ]] && dbcheck=$(cat $DBFILE | grep "^$1")
 
 		notify=true
 
@@ -95,10 +96,13 @@ main() {
 		if [ $notify == true ]
 		then
 
-			# Add streamer to currently streaming DB; remove him first to discard old information (only status/game may have changed).
-			DEL=`printf "\u2008"` # use Unicode 2008 ('PUNCTUATION SPACE') as a delimiter for the database file. This is a key that will not appear in the Twitch status.
-			sed -i "/^$1$DEL/d" $DBFILE
-			echo "$1$DEL$sgame$DEL$sstatus" >> $DBFILE
+			if [ $DBFILE ]
+			then
+				# Add streamer to currently streaming DB; remove him first to discard old information (only status/game may have changed).
+				DEL=`printf "\u2008"` # use Unicode 2008 ('PUNCTUATION SPACE') as a delimiter for the database file. This is a key that will not appear in the Twitch status.
+				sed -i "/^$1$DEL/d" $DBFILE
+				echo "$1$DEL$sgame$DEL$sstatus" >> $DBFILE
+			fi
 
 			# Send notification. NOTE This method has not yet been tested, and the variable probably needs to be renamed, but "notify" is already taken.
 			$MODULE "$schannel" "$sgame" "$sstatus" "$slink"
@@ -111,7 +115,7 @@ main() {
 		fi
 	else
 		# Remove from steaming DB if exists.
-		sed -i "/^$1$(printf "\u2008")/d" $DBFILE
+		[[ $DBFILE ]] && sed -i "/^$1$(printf "\u2008")/d" $DBFILE
 	fi
 }
 
