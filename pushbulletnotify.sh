@@ -11,3 +11,4 @@ if [ -n "$PB_TARGET" ]
 	else
 		# Push to all devices, if no target.
 		curl --header 'Authorization: Bearer '$PB_TOKEN'' -X POST https://api.pushbullet.com/v2/pushes --header 'Content-Type: application/json' --data-binary '{"type": "link", "title": "'"$1"' is streaming '"$2"'", "body": "'"$3"'", "url": "'"$4"'"}' > /dev/null
+fi
