@@ -2,19 +2,14 @@
 # twitcheck - A twitch.tv Stream Checker by BrowncoatShadow and Crendgrim
 # Useage: Copy settings.default.sh to settings.sh, configure settings and add this script to crontab.
 
+# BOOTSTRAPING
+
 # Include settings if they exist; create them from default template first otherwise
 TC_BASEDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 [[ -f "$HOME/.config/twitcheckrc" ]] || sed "s#<INSTALL_DIR>#$TC_BASEDIR#g" "$TC_BASEDIR/twitcheckrc.default" > "$HOME/.config/twitcheckrc"
 
+# Load settings
 source $HOME/.config/twitcheckrc
-
-# Check if we have a user set or any channels to follow
-if [[ -z "$USER" && -z "$FOLLOWLIST" ]]
-then
-	>&2 echo "You have to supply a user to fetch followed channels from, or set a FOLLOWLIST in the config!"
-	>&2 echo "The configuration file can be found at $HOME/.config/twitcheckrc"
-	exit
-fi
 
 # Generate folders and files if they do not exist
 if [[ ! -f $DATAFILE ]]
@@ -30,6 +25,17 @@ fi
 
 # Cleanup: If the database file is older than 2 hours, consider it outdated and remove its contents.
 [[ $((`date +%s`-`stat -c %Y $DBFILE`)) -gt 7200 ]] && echo > $DBFILE
+# 
+
+# BOOTSTRAPING END
+
+# Check if we have a user set or any channels to follow
+if [[ -z "$USER" && -z "$FOLLOWLIST" ]]
+then
+	>&2 echo "You have to supply a user to fetch followed channels from, or set a FOLLOWLIST in the config!"
+	>&2 echo "The configuration file can be found at $HOME/.config/twitcheckrc"
+	exit
+fi
 
 # Use the specified followlist, if set.
 list=$FOLLOWLIST
