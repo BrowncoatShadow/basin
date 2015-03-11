@@ -4,18 +4,21 @@
 
 source $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )'/settings.sh'
 
-# Check if we have a user set
-if [ ! -n "$USER" ]
+# Check if we have a user set or any channels to follow
+if [[ -z "$USER" && -z "$FOLLOWLIST" ]]
 then
-	>&2 echo "You have to supply a user to fetch followed channels from!"
+	>&2 echo "You have to supply a user to fetch followed channels from, or set a FOLLOWLIST in the config!"
 	exit
 fi
 
 # Cleanup: If the database file is older than 2 hours, consider it outdated and remove its contents.
 [[ $((`date +%s`-`stat -c %Y $DBFILE`)) -gt 7200 ]] && echo > $DBFILE
 
-# Fetch users follow list.
-list=$(curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/users/$USER/follows/channels?limit=100" | jq -r '.follows[] | .channel.name' | tr '\n' ' ')
+# Use the specified followlist, if set.
+list=$FOLLOWLIST
+
+# Fetch users follow list and add them.
+[[ -n $USER ]] && list="$list "$(curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/users/$USER/follows/channels?limit=100" | jq -r '.follows[] | .channel.name' | tr '\n' ' ')
 
 # Sanitize the list for the fetch url.
 urllist=$(echo $list | sed 's/ /\,/g')

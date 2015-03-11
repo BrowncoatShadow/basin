@@ -3,8 +3,10 @@
 
 # GENERAL SETTINGS
 
-# Your Twitch user in all lower-case letters.
+# Your Twitch user in all lower-case letters. If set, use this user's followed channels.
 USER=
+# Additional list of streams to check on, divided by spaces.
+FOLLOWLIST=
 # Twitch client_id, generate at <http://www.twitch.tv/kraken/oauth2/clients/new>.
 CLIENT=
 # The file to store the stream data returned from the Twitch API in.
