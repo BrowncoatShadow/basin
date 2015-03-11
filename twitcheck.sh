@@ -29,19 +29,26 @@ fi
 
 # BOOTSTRAPING END
 
-# Check if we have a user set or any channels to follow
-if [[ -z "$USER" && -z "$FOLLOWLIST" ]]
+# Check if script has been called with command-line arguments.
+if [[ -n $1 ]]
 then
-	>&2 echo "You have to supply a user to fetch followed channels from, or set a FOLLOWLIST in the config!"
-	>&2 echo "The configuration file can be found at $HOME/.config/twitcheckrc"
-	exit
+	# Use arguments instead of settings rc file.
+	list=$*
+else
+	# Check if we have a user set or any channels to follow.
+	if [[ -z "$USER" && -z "$FOLLOWLIST" ]]
+	then
+		>&2 echo "You have to supply a user to fetch followed channels from, or set a FOLLOWLIST in the config!"
+		>&2 echo "The configuration file can be found at $HOME/.config/twitcheckrc"
+		exit
+	else
+		# Use the specified followlist, if set.
+		list=$FOLLOWLIST
+
+		# If user is set fetch users follow list and add them to the list.
+		[[ -n $USER ]] && list="$list "$(curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/users/$USER/follows/channels?limit=100" | jq -r '.follows[] | .channel.name' | tr '\n' ' ')
+	fi
 fi
-
-# Use the specified followlist, if set.
-list=$FOLLOWLIST
-
-# Fetch users follow list and add them.
-[[ -n $USER ]] && list="$list "$(curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/users/$USER/follows/channels?limit=100" | jq -r '.follows[] | .channel.name' | tr '\n' ' ')
 
 # Sanitize the list for the fetch url.
 urllist=$(echo $list | sed 's/ /\,/g')
