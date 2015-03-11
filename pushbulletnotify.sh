@@ -1,7 +1,7 @@
 #!/bin/bash
 # Pushbullet notification module for twitcheck by Browncoatshadow
 
-source 'settings.sh'
+source $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )'/settings.sh'
 
 # Check if a target is defined.
 if [ -n "$PB_TARGET" ]

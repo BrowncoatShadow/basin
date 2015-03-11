@@ -2,7 +2,7 @@
 # twitcheck - A twitch.tv Stream Checker by BrowncoatShadow and Crendgrim
 # Useage: Copy settings.default.sh to settings.sh, configure settings and add this script to crontab.
 
-source 'settings.sh'
+source $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )'/settings.sh'
 
 # Cleanup: If the database file is older than 2 hours, consider it outdated and remove its contents.
 [[ $((`date +%s`-`stat -c %Y $DBFILE`)) -gt 7200 ]] && echo > $DBFILE
