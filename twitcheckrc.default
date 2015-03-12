@@ -27,5 +27,7 @@ MODULE=echo_notify.sh
 PB_TOKEN=
 # Pushbullet device ID. Leave blank to push to all devices.
 PB_TARGET=
+# Change to 'true' to use application URI instead of URL, for launching app instead of website.
+PB_URI=false
 
 # PUSHBULLET SETTINGS END

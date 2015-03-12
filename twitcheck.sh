@@ -107,7 +107,7 @@ main() {
 
 			# Send notification by using the module and giving it the arguments.
 			push=$MODDIR$MODULE
-			$push "$schannel" "$sgame" "$sstatus" "$slink"
+			$push "$schannel" "$sgame" "$sstatus" "$slink" "$1"
 
 		else
 
