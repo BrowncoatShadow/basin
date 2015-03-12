@@ -38,6 +38,7 @@ You can also invoke the script with users as arguments. It will ignore your conf
 - [jq](http://stedolan.github.io/jq/)
 - [curl](http://curl.haxx.se/)
 - Optional: KDialog
+- Optional: [terminal-notifier](https://github.com/alloy/terminal-notifier) (OS X)
 
 ## Contributing
 You are more than welcome to submit patches and features to be added to the project. If you write your own notification module, we would also be interested in looking at it.
