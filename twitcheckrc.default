@@ -1,33 +1,39 @@
 #!/bin/bash
 # twitcheck - A twitch.tv Stream Checker by BrowncoatShadow and Crendgrim
 
-# GENERAL SETTINGS
-
-# Your Twitch user in all lower-case letters. If set, use this user's followed channels.
+### GENERAL SETTINGS
+# USER - Your Twitch user in all lower-case letters. If set, use this user's followed channels.
+# 	default: USER=
+# FOLLOWLIST - Additional list of streams to check on, divided by spaces. Useful for watching yourself.
+#	default: FOLLOWLIST=
+# CLIENT - Twitch client_id, generate at <http://www.twitch.tv/kraken/oauth2/clients/new>.
+#	default: CLIENT=
+# DATAFILE - The file for storing the stream data returned from the Twitch API.
+#	default: DATAFILE=$HOME/.local/share/twitcheck/return.json
+# DBFILE - The database file for storing currently online streams.
+#	default: DBFILE=$HOME/.local/share/twitcheck/online.txt
+# MODDIR - The directory that modules are stored in.
+#	default: MODDIR=<INSTALL_DIR>/modules/
+# MODULE - The notification module to use. The order of arguments is $CHANNEL, $GAME, $STATUS, $LINK.
+#	default: MODULE=echo_notify.sh
+###
 USER=
-# Additional list of streams to check on, divided by spaces.
 FOLLOWLIST=
-# Twitch client_id, generate at <http://www.twitch.tv/kraken/oauth2/clients/new>.
 CLIENT=
-# The file to store the stream data returned from the Twitch API in.
 DATAFILE=$HOME/.local/share/twitcheck/return.json
-# A database file to store currently online streams in.
 DBFILE=$HOME/.local/share/twitcheck/online.txt
-# The directory that modules are stored in.
 MODDIR=<INSTALL_DIR>/modules/
-# The notification module to use. The order of arguments is $CHANNEL, $GAME, $STATUS, $LINK.
 MODULE=echo_notify.sh
 
-# GENERAL SETTINGS END
 
-
-# PUSHBULLET SETTINGS
-
-# Pushbullet access token.
+### PUSHBULLET SETTINGS
+# PB_TOKEN - Pushbullet access token. Find at <https://www.pushbullet.com/account>
+# 	default: PB_TOKEN=
+# PB_TARGET - Pushbullet device ID. Leave blank to push to all devices.
+#	default: PB_TARGET=
+# PB_URI - Change to 'true' to use application URI instead of URL, for launching app instead of website.
+#	default: PB_URI=false
+###
 PB_TOKEN=
-# Pushbullet device ID. Leave blank to push to all devices.
 PB_TARGET=
-# Change to 'true' to use application URI instead of URL, for launching app instead of website.
 PB_URI=false
-
-# PUSHBULLET SETTINGS END
