@@ -93,7 +93,19 @@ main() {
 		slink=$(get_data $1 'url')
 		sstatus=$(get_data $1 'status')
 
-		[[ "$sgame" == null || "$sstatus" == null ]] && return # sometimes the API sends us broken results. Ignore these.
+		# Sometimes, the API sends broken results. Handle these gracefully.
+		if [[ "$sgame" == null || "$sstatus" == null ]]
+		then
+			# If the stream was live before, assume the results to be broken, so we don't re-notify.
+			if [ -n "$dbcheck" ]
+			then
+				# Recover the old data
+				sgame=$(get_db $1 'game')
+				sstatus=$(get_db $1 'status')
+			else
+				return # Stream was not live, ignore the broken result to not get a null/null notification.
+			fi
+		fi
 
 		# Add stream to online db
 		onlinedb+=$(printf $',\n{"name":"%s","game":"%s","status":"%s"}' "$name" "$sgame" "$sstatus")
