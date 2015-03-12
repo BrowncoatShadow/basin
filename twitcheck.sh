@@ -74,11 +74,14 @@ get_db() {
 	echo $(cat $DBFILE | jq -r '.online[] | select(.name=="'$1'") | .'$2)
 }
 
+encode_quotes() {
+	echo "$1" | sed 's/"/\\"/g'
+}
+
 main() {
 
 	# Check if stream is active.
 	name=$(get_data $1 'name')
-
 
 	if [ "$name" == "$1" ]
 	then
@@ -108,7 +111,7 @@ main() {
 		fi
 
 		# Add stream to online db
-		onlinedb+=$(printf $',\n{"name":"%s","game":"%s","status":"%s"}' "$name" "$sgame" "$sstatus")
+		onlinedb+=$(printf $',\n{"name":"%s","game":"%s","status":"%s"}' "$name" "$sgame" "$(encode_quotes "$sstatus")")
 
 		# Already streaming last time, check for updates
 		if [ -n "$dbcheck" ]
