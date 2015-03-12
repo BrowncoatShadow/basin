@@ -1,42 +1,46 @@
 #!/bin/bash
 # twitcheck - A twitch.tv Stream Checker by BrowncoatShadow and Crendgrim
-# Useage: Copy settings.default.sh to settings.sh, configure settings and add this script to crontab.
 
-# BOOTSTRAPING
 
-# Include settings if they exist; create them from default template first otherwise
+# BOOTSTRAPPING
+
+# Figure out the directory this script is living in.
 TC_BASEDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+
+# If the settings do not exist yet, create them from default template.
 [[ -f "$HOME/.config/twitcheckrc" ]] || sed "s#<INSTALL_DIR>#$TC_BASEDIR#g" "$TC_BASEDIR/twitcheckrc.default" > "$HOME/.config/twitcheckrc"
 
-# Load settings
+# Load settings.
 source $HOME/.config/twitcheckrc
 
-# Generate folders and files if they do not exist
-if [[ ! -f $DATAFILE ]]
-then
-	mkdir -p $(dirname $DATAFILE)
-	touch $DATAFILE
-fi
-if [[ ! -f $DBFILE ]]
-then
-	mkdir -p $(dirname $DBFILE)
-	touch $DBFILE
-fi
+# Generate folders and files if they do not exist.
+check_file() {
+	if [[ ! -f $1 ]]
+	then
+		mkdir -p $(dirname $1)
+		touch $1
+	fi
+}
+check_file $DATAFILE
+check_file $DBFILE
 
 # Cleanup: If the database file is older than 2 hours, consider it outdated and remove its contents.
 [[ $((`date +%s`-`stat -c %Y $DBFILE`)) -gt 7200 ]] && echo > $DBFILE
-# 
 
-# BOOTSTRAPING END
+# BOOTSTRAPPING END
+
 
 # Check if script has been called with command-line arguments.
 if [[ -n $1 ]]
 then
+
 	# Use arguments instead of settings rc file and use the echo module.
 	list=$*
 	MODULE=echo_notify.sh
 	unset DBFILE
+
 else
+
 	# Check if we have a user set or any channels to follow.
 	if [[ -z "$USER" && -z "$FOLLOWLIST" ]]
 	then
@@ -61,25 +65,33 @@ curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+js
 # Set up new json file.
 onlinedb=
 
-# Main function
+# Functions
+get_data() {
+	echo $(cat $DATAFILE | jq -r '.streams[] | select(.channel.name=="'$1'") | .channel.'$2)
+}
+
+get_db() {
+	echo $(cat $DBFILE | jq -r '.online[] | select(.name=="'$1'") | .'$2)
+}
+
 main() {
 
 	# Check if stream is active.
-	name=$(cat $DATAFILE | jq -r '.streams[] | select(.channel.name=="'$1'") | .channel.name')
+	name=$(get_data $1 'name')
 
 
 	if [ "$name" == "$1" ]
 	then
 		# Check if it has been active since last check.
-		[[ $DBFILE ]] && dbcheck=$(cat $DBFILE | jq -r '.online[] | select(.name=="'$1'") | .name')
+		[[ $DBFILE ]] && dbcheck=$(get_db $1 'name')
 
 		notify=true
 
 		# Grab important info from JSON check.
-		schannel=$(cat $DATAFILE | jq -r '.streams[] | select(.channel.name=="'$1'") | .channel.display_name')
-		sgame=$(cat $DATAFILE | jq -r '.streams[] | select(.channel.name=="'$1'") | .channel.game')
-		slink=$(cat $DATAFILE | jq -r '.streams[] | select(.channel.name=="'$1'") | .channel.url')
-		sstatus=$(cat $DATAFILE | jq -r '.streams[] | select(.channel.name=="'$1'") | .channel.status')
+		schannel=$(get_data $1 'display_name')
+		sgame=$(get_data $1 'game')
+		slink=$(get_data $1 'url')
+		sstatus=$(get_data $1 'status')
 
 		[[ "$sgame" == null || "$sstatus" == null ]] && return # sometimes the API sends us broken results. Ignore these.
 
@@ -92,9 +104,9 @@ main() {
 
 			notify=false
 
-			dbgame=$(cat $DBFILE | jq -r '.online[] | select(.name=="'$1'") | .game')
-			dbstatus=$(cat $DBFILE | jq -r '.online[] | select(.name=="'$1'") | .status')
-			
+			dbgame=$(get_db $1 'game')
+			dbstatus=$(get_db $1 'status')
+
 			# Notify when game or status change
 			[[ "$dbgame" != "$sgame" || "$dbstatus" != "$sstatus" ]] && notify=true
 
@@ -104,8 +116,7 @@ main() {
 		then
 
 			# Send notification by using the module and giving it the arguments.
-			push=$MODDIR$MODULE
-			$push "$schannel" "$sgame" "$sstatus" "$slink" "$1"
+			$MODDIR$MODULE "$schannel" "$sgame" "$sstatus" "$slink" "$1"
 
 		fi
 	fi
