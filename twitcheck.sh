@@ -42,7 +42,7 @@ else
 	then
 		>&2 echo "You have to supply a user to fetch followed channels from, or set a FOLLOWLIST in the config!"
 		>&2 echo "The configuration file can be found at $HOME/.config/twitcheckrc"
-		exit
+		exit 1
 	else
 		# Use the specified followlist, if set.
 		list=$FOLLOWLIST
