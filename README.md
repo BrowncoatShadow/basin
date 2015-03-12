@@ -1,6 +1,6 @@
 twitcheck
 =========
-**twitcheck.sh** is a quick and dirty, modular bash script that checks twitch.tv to see if channels you care about are streaming, and then reports the results using a selection of modules.
+**twitcheck.sh** is a quick and dirty, modular bash script that checks [twitch.tv](http://twitch.tv) to see if channels you care about are streaming, and then reports the results using a selection of modules.
 
 ## Installation
 ```
