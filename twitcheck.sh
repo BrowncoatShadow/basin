@@ -58,16 +58,20 @@ urllist=$(echo $list | sed 's/ /\,/g')
 # Fetch the JSON for all followed channels.
 curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/streams?channel=$urllist&limit=100" > $DATAFILE
 
+# Set up new json file.
+onlinedb=
+
 # Main function
 main() {
 
 	# Check if stream is active.
 	name=$(cat $DATAFILE | jq -r '.streams[] | select(.channel.name=="'$1'") | .channel.name')
 
+
 	if [ "$name" == "$1" ]
 	then
 		# Check if it has been active since last check.
-		[[ $DBFILE ]] && dbcheck=$(cat $DBFILE | grep "^$1")
+		[[ $DBFILE ]] && dbcheck=$(cat $DBFILE | jq -r '.online[] | select(.name=="'$1'") | .name')
 
 		notify=true
 
@@ -79,15 +83,17 @@ main() {
 
 		[[ "$sgame" == null || "$sstatus" == null ]] && return # sometimes the API sends us broken results. Ignore these.
 
+		# Add stream to online db
+		onlinedb+=$(printf $',\n{"name":"%s","game":"%s","status":"%s"}' "$name" "$sgame" "$sstatus")
+
 		# Already streaming last time, check for updates
 		if [ -n "$dbcheck" ]
 		then
 
 			notify=false
 
-			IFS=`printf "\u2008"` read -ra dbdata <<< "$dbcheck"
-			dbgame=${dbdata[1]}
-			dbstatus=${dbdata[2]}
+			dbgame=$(cat $DBFILE | jq -r '.online[] | select(.name=="'$1'") | .game')
+			dbstatus=$(cat $DBFILE | jq -r '.online[] | select(.name=="'$1'") | .status')
 			
 			# Notify when game or status change
 			[[ "$dbgame" != "$sgame" || "$dbstatus" != "$sstatus" ]] && notify=true
@@ -97,28 +103,13 @@ main() {
 		if [ $notify == true ]
 		then
 
-			if [ $DBFILE ]
-			then
-				# Add streamer to currently streaming DB; remove him first to discard old information (only status/game may have changed).
-				DEL=`printf "\u2008"` # use Unicode 2008 ('PUNCTUATION SPACE') as a delimiter for the database file. This is a key that will not appear in the Twitch status.
-				sed -i "/^$1$DEL/d" $DBFILE
-				echo "$1$DEL$sgame$DEL$sstatus" >> $DBFILE
-			fi
-
 			# Send notification by using the module and giving it the arguments.
 			push=$MODDIR$MODULE
 			$push "$schannel" "$sgame" "$sstatus" "$slink" "$1"
 
-		else
-
-			# Exit if already streaming in past check and no updates.
-			return 
-
 		fi
-	else
-		# Remove from steaming DB if exists.
-		[[ $DBFILE ]] && sed -i "/^$1$(printf "\u2008")/d" $DBFILE
 	fi
+
 }
 
 # Run the main function for each stream.
@@ -126,3 +117,8 @@ for var in $list
 do
 	main $var
 done
+
+# Save online db as json.
+[[ $DBFILE ]] && echo "{\"online\":[${onlinedb:1}"$'\n]}' > $DBFILE
+
+exit 0
