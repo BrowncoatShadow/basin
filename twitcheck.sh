@@ -25,7 +25,7 @@ check_file $DATAFILE
 check_file $DBFILE
 
 # Cleanup: If the database file is older than 2 hours, consider it outdated and remove its contents.
-[[ $(($(date +%s)-$(cat $DBFILE | jq -r '.lastcheck'))) -gt 7200 ]] && echo > $DBFILE
+[[ -s $DBFILE && $(($(date +%s)-$(cat $DBFILE | jq -r '.lastcheck'))) -gt 7200 ]] && echo > $DBFILE
 
 # BOOTSTRAPPING END
 
