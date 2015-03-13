@@ -37,3 +37,10 @@ MODULE=echo_notify.sh
 PB_TOKEN=
 PB_TARGET=
 PB_URI=false
+
+
+### OS X SETTINGS
+# OSX_TERMNOTY - Set to 'true' to use terminal-notifier app instead of applescript. This enables clicking the notification to launch URL.
+#	default: OSX_TERMNOTY=false
+###
+OSX_TERMNOTY=false
