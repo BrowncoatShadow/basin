@@ -8,7 +8,8 @@ source $HOME/.config/twitcheckrc
 if [ "$PB_URI" == "true" ]
 then
 	# If true, then replace URL with URI link.
-	url="twitch://stream/$5"
+	name=$(echo $1 | tr '[:upper:]' '[:lower:]')
+	url="twitch://stream/$name"
 else
 	# If not true, then use regular URL.
 	url="$4"

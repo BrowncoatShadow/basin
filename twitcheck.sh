@@ -131,7 +131,7 @@ main() {
 		then
 
 			# Send notification by using the module and giving it the arguments.
-			$MODDIR$MODULE "$schannel" "$sgame" "$sstatus" "$slink" "$1"
+			$MODDIR$MODULE "$schannel" "$sgame" "$sstatus" "$slink"
 
 		fi
 	fi
