@@ -15,5 +15,5 @@ then
 else
 
 	# Send using OS X applescript (no URL support)
-	osascript -e 'display notification "$3" with title "Twitch" subtitle "$1 is now streaming $2"'
+	osascript -e "display notification \"$3\" with title \"Twitch\" subtitle \"$1 is now streaming $2\""
 fi
