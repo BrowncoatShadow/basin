@@ -4,6 +4,9 @@
 
 # BOOTSTRAPPING
 
+# Add jq's install dir (via homebrew) to PATH for cron on OS X
+PATH=$PATH:/usr/local/bin
+
 # Figure out the directory this script is living in.
 TC_BASEDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
