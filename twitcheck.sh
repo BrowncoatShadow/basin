@@ -56,8 +56,11 @@ else
 	fi
 fi
 
-# Sanitize the list for the fetch url, remove duplicates.
-urllist=$(echo $(printf '%s\n' $list | sort -u) | sed 's/ /\,/g')
+# Remove duplicates from the list.
+list=$(echo $(printf '%s\n' $list | sort -u))
+
+# Sanitize the list for the fetch url.
+urllist=$(echo $list | sed 's/ /\,/g')
 
 # Fetch the JSON for all followed channels.
 curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/streams?channel=$urllist&limit=100" > $DATAFILE
