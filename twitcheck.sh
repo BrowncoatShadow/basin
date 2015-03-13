@@ -56,8 +56,8 @@ else
 	fi
 fi
 
-# Sanitize the list for the fetch url.
-urllist=$(echo $list | sed 's/ /\,/g')
+# Sanitize the list for the fetch url, remove duplicates.
+urllist=$(echo $(printf '%s\n' $list | sort -u) | sed 's/ /\,/g')
 
 # Fetch the JSON for all followed channels.
 curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/streams?channel=$urllist&limit=100" > $DATAFILE
@@ -91,10 +91,10 @@ main() {
 		notify=true
 
 		# Grab important info from JSON check.
-		schannel=$(get_data $1 'display_name')
-		sgame=$(get_data $1 'game')
-		slink=$(get_data $1 'url')
-		sstatus=$(get_data $1 'status')
+		schannel="$(get_data $1 'display_name')"
+		sgame="$(get_data $1 'game')"
+		slink="$(get_data $1 'url')"
+		sstatus="$(get_data $1 'status')"
 
 		# Sometimes, the API sends broken results. Handle these gracefully.
 		if [[ "$sgame" == null || "$sstatus" == null ]]
@@ -103,8 +103,8 @@ main() {
 			if [ -n "$dbcheck" ]
 			then
 				# Recover the old data
-				sgame=$(get_db $1 'game')
-				sstatus=$(get_db $1 'status')
+				sgame="$(get_db $1 'game')"
+				sstatus="$(get_db $1 'status')"
 			else
 				return # Stream was not live, ignore the broken result to not get a null/null notification.
 			fi
@@ -119,8 +119,8 @@ main() {
 
 			notify=false
 
-			dbgame=$(get_db $1 'game')
-			dbstatus=$(get_db $1 'status')
+			dbgame="$(get_db $1 'game')"
+			dbstatus="$(get_db $1 'status')"
 
 			# Notify when game or status change
 			[[ "$dbgame" != "$sgame" || "$dbstatus" != "$sstatus" ]] && notify=true
