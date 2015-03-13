@@ -25,7 +25,7 @@ check_file $DATAFILE
 check_file $DBFILE
 
 # Cleanup: If the database file is older than 2 hours, consider it outdated and remove its contents.
-[[ $((`date +%s`-`stat -c %Y $DBFILE`)) -gt 7200 ]] && echo > $DBFILE
+[[ $(($(date +%s)-$(cat $DBFILE | jq -r '.lastcheck'))) -gt 7200 ]] && echo > $DBFILE
 
 # BOOTSTRAPPING END
 
@@ -148,6 +148,6 @@ do
 done
 
 # Save online db as json.
-[[ $DBFILE ]] && echo "{\"online\":[${onlinedb:1}"$'\n]}' > $DBFILE
+[[ $DBFILE ]] && echo "{\"online\":[${onlinedb:1}"$'\n],\n\"lastcheck\":\"'$(date +%s)'"}' > $DBFILE
 
 exit 0
