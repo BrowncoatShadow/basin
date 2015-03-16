@@ -4,7 +4,19 @@
 
 # BOOTSTRAPPING
 
-# Add jq's install dir (via homebrew) to PATH for cron on OS X
+# Check for flags.
+while getopts ":l:" opt; do
+	case $opt in
+		l)
+			alt_list=$OPTARG >&2
+		;;
+		\?)
+			echo "Invalid option: -$OPTARG" >&2
+		;;
+	esac
+done
+
+# Add jq's install dir (via homebrew) to PATH for cron on OS X.
 PATH=$PATH:/usr/local/bin
 
 # Figure out the directory this script is living in.
@@ -34,11 +46,11 @@ check_file $DBFILE
 
 
 # Check if script has been called with command-line arguments.
-if [[ -n $1 ]]
+if [[ -n "$alt_list" ]]
 then
 
 	# Use arguments instead of settings rc file and use the echo module.
-	list=$*
+	list=$alt_list
 	MODULE=echo_notify.sh
 	unset DBFILE
 
