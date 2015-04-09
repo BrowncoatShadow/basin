@@ -28,8 +28,10 @@ crontab -l | { cat; echo "*/1 * * * * ~/twitcheck/twitcheck.sh"; } | crontab -
 ```
 The above command assumes you installed the script in your home folder and runs it every minute. You can tweak the cronjob to use a custom location for the script and/or the interval for running the script.
 
-Alternitively, you can manually add the script to your crontab by running `crontab -e` and adding the line:  
-`*/1 * * * * ~/twitcheck/twitcheck.sh`
+Alternitively, you can manually add the script to your crontab by running `crontab -e` and adding the below line.  
+```
+*/1 * * * * ~/twitcheck/twitcheck.sh
+```
 Again, this assumes a check every minute and script installation in your home folder. 
 
 
