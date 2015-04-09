@@ -2,7 +2,7 @@
 # twitcheck - A twitch.tv Stream Checker by BrowncoatShadow and Crendgrim
 
 
-# BOOTSTRAPPING
+# BEGIN BOOTSTRAPPING
 
 # Check for flags.
 while getopts ":l:" opt; do
@@ -22,7 +22,7 @@ PATH=$PATH:/usr/local/bin
 # Figure out the directory this script is living in.
 TC_BASEDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
-# If the settings do not exist yet, create them from default template.
+# If the settings do not exist yet, create them from a default template.
 [[ -f "$HOME/.config/twitcheckrc" ]] || sed "s#<INSTALL_DIR>#$TC_BASEDIR#g" "$TC_BASEDIR/twitcheckrc.default" > "$HOME/.config/twitcheckrc"
 
 # Load settings.
@@ -41,49 +41,17 @@ check_file $DBFILE
 # Cleanup: If the database file is older than 2 hours, consider it outdated and remove its contents.
 [[ -s $DBFILE && $(($(date +%s)-$(cat $DBFILE | jq -r '.lastcheck'))) -gt 7200 ]] && echo > $DBFILE
 
-# BOOTSTRAPPING END
+# END BOOTSTRAPPING
 
 
-# Check if script has been called with command-line arguments.
-if [[ -n "$alt_list" ]]
-then
+# BEGIN FUNCTIONS
 
-	# Use arguments instead of settings rc file and use the echo module.
-	list=$alt_list
-	MODULE=echo_notify.sh
-	unset DBFILE
-
-else
-
-	# Check if we have a user set or any channels to follow.
-	if [[ -z "$USER" && -z "$FOLLOWLIST" ]]
-	then
-		>&2 echo "You have to supply a user to fetch followed channels from, or set a FOLLOWLIST in the config!"
-		>&2 echo "The configuration file can be found at $HOME/.config/twitcheckrc"
-		exit 1
-	else
-		# Use the specified followlist, if set.
-		list=$FOLLOWLIST
-
-		# If user is set fetch users follow list and add them to the list.
-		[[ -n $USER ]] && list="$list "$(curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/users/$USER/follows/channels?limit=100" | jq -r '.follows[] | .channel.name' | tr '\n' ' ')
-	fi
-fi
-
-# Remove duplicates from the list.
-list=$(echo $(printf '%s\n' $list | sort -u))
-
-# Sanitize the list for the fetch url.
-urllist=$(echo $list | sed 's/ /\,/g')
-
-# Fetch the JSON for all followed channels.
-returned_data=$(curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/streams?channel=$urllist&limit=100")
-
-# Functions
+# Get data from the returned json
 get_data() {
 	echo $returned_data | jq -r '.streams[] | select(.channel.name=="'$1'") | .channel.'$2
 }
 
+# Get data from the database
 get_db() {
 	echo $(cat $DBFILE | jq -r '.online[] | select(.name=="'$1'") | .'$2)
 }
@@ -145,13 +113,55 @@ main() {
 
 }
 
+# END FUNCTIONS
+
+
+# BEGIN PROGRAM
+
+# Check if script has been called with command-line arguments.
+if [[ -n "$alt_list" ]]
+then
+
+	# Use arguments instead of settings rc file and use the echo module.
+	list=$alt_list
+	MODULE=echo_notify.sh
+	unset DBFILE
+
+else
+
+	# Check if we have a user set or any channels to follow.
+	if [[ -z "$USER" && -z "$FOLLOWLIST" ]]
+	then
+		>&2 echo "You have to supply a user to fetch followed channels from, or set a FOLLOWLIST in the config!"
+		>&2 echo "The configuration file can be found at $HOME/.config/twitcheckrc"
+		exit 1
+	else
+		# Use the specified followlist, if set.
+		list=$FOLLOWLIST
+
+		# If user is set fetch users follow list and add them to the list.
+		[[ -n $USER ]] && list="$list "$(curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/users/$USER/follows/channels?limit=100" | jq -r '.follows[] | .channel.name' | tr '\n' ' ')
+	fi
+fi
+
+# Remove duplicates from the list.
+list=$(echo $(printf '%s\n' $list | sort -u))
+
+# Sanitize the list for the fetch url.
+urllist=$(echo $list | sed 's/ /\,/g')
+
+# Fetch the JSON for all followed channels.
+returned_data=$(curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/streams?channel=$urllist&limit=100")
+
+# Run the main function for each stream.
+for channel in $list
+do
+	main $channel
+done
+
 # Setup online database.
 [[ $DBFILE ]] && echo "$returned_data" | jq '{online:[.streams[] | {name:.channel.name, game:.channel.game, status:.channel.status}], lastcheck:'$(date +%s)'}' > $DBFILE
 
-# Run the main function for each stream.
-for var in $list
-do
-	main $var
-done
+# END PROGRAM
 
 exit 0
