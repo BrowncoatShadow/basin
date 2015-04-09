@@ -8,8 +8,6 @@
 #	default: FOLLOWLIST=""
 # CLIENT - Twitch client_id, generate at <http://www.twitch.tv/kraken/oauth2/clients/new>.
 #	default: CLIENT=
-# DATAFILE - The file for storing the stream data returned from the Twitch API.
-#	default: DATAFILE=$HOME/.local/share/twitcheck/return.json
 # DBFILE - The database file for storing currently online streams.
 #	default: DBFILE=$HOME/.local/share/twitcheck/online.json
 # MODDIR - The directory that modules are stored in.
@@ -20,7 +18,6 @@
 USER=
 FOLLOWLIST=""
 CLIENT=
-DATAFILE=$HOME/.local/share/twitcheck/return.json
 DBFILE=$HOME/.local/share/twitcheck/online.json
 MODDIR=<INSTALL_DIR>/modules/
 MODULE=echo_notify.sh

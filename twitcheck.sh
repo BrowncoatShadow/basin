@@ -36,7 +36,6 @@ check_file() {
 		touch $1
 	fi
 }
-check_file $DATAFILE
 check_file $DBFILE
 
 # Cleanup: If the database file is older than 2 hours, consider it outdated and remove its contents.
@@ -78,14 +77,14 @@ list=$(echo $(printf '%s\n' $list | sort -u))
 urllist=$(echo $list | sed 's/ /\,/g')
 
 # Fetch the JSON for all followed channels.
-curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/streams?channel=$urllist&limit=100" > $DATAFILE
+returned_data=$(curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/streams?channel=$urllist&limit=100")
 
 # Set up new json file.
 onlinedb=
 
 # Functions
 get_data() {
-	echo $(cat $DATAFILE | jq -r '.streams[] | select(.channel.name=="'$1'") | .channel.'$2)
+	echo $returned_data | jq -r '.streams[] | select(.channel.name=="'$1'") | .channel.'$2
 }
 
 get_db() {
