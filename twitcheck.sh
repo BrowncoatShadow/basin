@@ -79,9 +79,6 @@ urllist=$(echo $list | sed 's/ /\,/g')
 # Fetch the JSON for all followed channels.
 returned_data=$(curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/streams?channel=$urllist&limit=100")
 
-# Set up new json file.
-onlinedb=
-
 # Functions
 get_data() {
 	echo $returned_data | jq -r '.streams[] | select(.channel.name=="'$1'") | .channel.'$2
@@ -89,10 +86,6 @@ get_data() {
 
 get_db() {
 	echo $(cat $DBFILE | jq -r '.online[] | select(.name=="'$1'") | .'$2)
-}
-
-encode_quotes() {
-	echo "$1" | sed 's/"/\\"/g'
 }
 
 main() {
@@ -127,9 +120,6 @@ main() {
 			fi
 		fi
 
-		# Add stream to online db
-		onlinedb+=$(printf $',\n{"name":"%s","game":"%s","status":"%s"}' "$name" "$sgame" "$(encode_quotes "$sstatus")")
-
 		# Already streaming last time, check for updates
 		if [ -n "$dbcheck" ]
 		then
@@ -155,13 +145,13 @@ main() {
 
 }
 
+# Setup online database.
+[[ $DBFILE ]] && echo "$returned_data" | jq '{online:[.streams[] | {name:.channel.name, game:.channel.game, status:.channel.status}], lastcheck:'$(date +%s)'}' > $DBFILE
+
 # Run the main function for each stream.
 for var in $list
 do
 	main $var
 done
-
-# Save online db as json.
-[[ $DBFILE ]] && echo "{\"online\":[${onlinedb:1}"$'\n],\n\"lastcheck\":\"'$(date +%s)'"}' > $DBFILE
 
 exit 0
