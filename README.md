@@ -51,6 +51,8 @@ You will also need to define any settings required for your module of choice. Th
 
 
 ## Flags
+- `-d`
+  - Debug flag. This will cause the script to output useful debug information.
 - `-l "<channel>..."`
   - This uses the channels provided in the argument instead of any defined in the config, ignores the database of channels the script already knows are streaming, and then echos any currently streaming channels to the console using the echo_notify.sh module. This is useful if you want to quickly do a manual check on a handful of channels.
 
