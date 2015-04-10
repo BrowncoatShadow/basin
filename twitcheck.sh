@@ -5,8 +5,12 @@
 # BEGIN BOOTSTRAPPING
 
 # Check for flags.
-while getopts ":l:" opt; do
+while getopts ":dl:" opt; do
 	case $opt in
+		d)
+			debug=true
+			echo "BEGIN DEBUG $(date +'%F %T')"
+		;;
 		l)
 			alt_list=$OPTARG >&2
 		;;
@@ -46,6 +50,16 @@ check_file $DBFILE
 
 # BEGIN FUNCTIONS
 
+debug_echo() {
+	if [ "$debug" == "true" ]
+	then
+		echo "$1"
+		echo "$2"
+	else
+		return	
+	fi
+}
+
 # Get data from the returned json
 get_data() {
 	echo $returned_data | jq -r '.streams[] | select(.channel.name=="'$1'") | .channel.'$2
@@ -63,6 +77,7 @@ main() {
 
 	if [ "$name" == "$1" ]
 	then
+
 		# Check if it has been active since last check.
 		[[ $DBFILE ]] && dbcheck=$(get_db $1 'name')
 
@@ -99,7 +114,6 @@ main() {
 
 			# Notify when game or status change
 			[[ "$dbgame" != "$sgame" || "$dbstatus" != "$sstatus" ]] && notify=true
-
 		fi
 
 		if [ $notify == true ]
@@ -107,7 +121,6 @@ main() {
 
 			# Send notification by using the module and giving it the arguments.
 			$MODDIR$MODULE "$schannel" "$sgame" "$sstatus" "$slink"
-
 		fi
 	fi
 
@@ -118,7 +131,7 @@ main() {
 
 # BEGIN PROGRAM
 
-# Check if script has been called with command-line arguments.
+# Check if script is using an alternitive channel list.
 if [[ -n "$alt_list" ]]
 then
 
@@ -126,7 +139,6 @@ then
 	list=$alt_list
 	MODULE=echo_notify.sh
 	unset DBFILE
-
 else
 
 	# Check if we have a user set or any channels to follow.
@@ -146,12 +158,14 @@ fi
 
 # Remove duplicates from the list.
 list=$(echo $(printf '%s\n' $list | sort -u))
+debug_echo "LIST" "$list"
 
 # Sanitize the list for the fetch url.
 urllist=$(echo $list | sed 's/ /\,/g')
 
 # Fetch the JSON for all followed channels.
 returned_data=$(curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/streams?channel=$urllist&limit=100")
+debug_echo "RETURN" "$returned_data"
 
 # Run the main function for each stream.
 for channel in $list
@@ -161,6 +175,9 @@ done
 
 # Setup online database.
 [[ $DBFILE ]] && echo "$returned_data" | jq '{online:[.streams[] | {name:.channel.name, game:.channel.game, status:.channel.status}], lastcheck:'$(date +%s)'}' > $DBFILE
+
+[[ -n $DBFILE ]] && debug_echo "DATABASE" "$(cat $DBFILE)"
+debug_echo "END DEBUG" ""
 
 # END PROGRAM
 
