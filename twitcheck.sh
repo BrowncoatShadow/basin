@@ -15,6 +15,7 @@ while getopts ":dl:" opt; do
 		;;
 		\?)
 			echo "Invalid option: -$OPTARG" >&2
+			exit 1
 		;;
 	esac
 done
@@ -62,7 +63,7 @@ debug_output() {
 		unset $database_json
 		if [ -n "$DBFILE" ]
 		then
-			database_json=', "database":'$(cat "$DBFILE")
+			database_json=', "database":'$(cat $DBFILE)
 		fi
 
 		debug_data=$(echo '{"old":'$(cat $DEBUGFILE)', "new":{"id":"'$(date +%s)'", "date":"'$(date +%F\ %T)'", "list":"'$list'", "return":'$returned_data$database_json'}}' | jq '[.old[], .new]')
@@ -89,7 +90,7 @@ main() {
 	then
 
 		# Check if it has been active since last check.
-		[[ $DBFILE ]] && dbcheck=$(get_db $1 'name')
+		[[ -n "$DBFILE" ]] && dbcheck=$(get_db $1 'name')
 
 		notify=true
 
@@ -146,7 +147,7 @@ if [[ -n "$alt_list" ]]
 then
 
 	# Use arguments instead of settings rc file and use the echo module.
-	list=$alt_list
+	list="$alt_list"
 	MODULE=echo_notify.sh
 	unset DBFILE
 else
@@ -159,7 +160,7 @@ else
 		exit 1
 	else
 		# Use the specified followlist, if set.
-		list=$FOLLOWLIST
+		list="$FOLLOWLIST"
 
 		# If user is set fetch users follow list and add them to the list.
 		[[ -n $USER ]] && list="$list "$(curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/users/$USER/follows/channels?limit=100" | jq -r '.follows[] | .channel.name' | tr '\n' ' ')
@@ -182,7 +183,7 @@ do
 done
 
 # Setup online database.
-[[ $DBFILE ]] && echo "$returned_data" | jq '{online:[.streams[] | {name:.channel.name, game:.channel.game, status:.channel.status}], lastcheck:'$(date +%s)'}' > $DBFILE
+[[ -n "$DBFILE" ]] && echo "$returned_data" | jq '{online:[.streams[] | {name:.channel.name, game:.channel.game, status:.channel.status}], lastcheck:'$(date +%s)'}' > $DBFILE
 
 debug_output
 
