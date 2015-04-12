@@ -9,7 +9,6 @@ while getopts ":dl:" opt; do
 	case $opt in
 		d)
 			debug=true
-			echo "BEGIN DEBUG $(date +'%F %T')"
 		;;
 		l)
 			alt_list=$OPTARG >&2
@@ -45,6 +44,7 @@ check_file() {
 	fi
 }
 check_file $DBFILE "{}"
+[[ "$debug" == "true" ]] && check_file $DEBUGFILE "[]"
 
 # Cleanup: If the database file is older than 2 hours, consider it outdated and remove its contents.
 [[ -s $DBFILE && $(($(date +%s)-$(cat $DBFILE | jq -r '.lastcheck // 0'))) -gt 7200 ]] && echo > $DBFILE
@@ -54,13 +54,19 @@ check_file $DBFILE "{}"
 
 # BEGIN FUNCTIONS
 
-debug_echo() {
+# Output debug info to file, if requested.
+debug_output() {
 	if [ "$debug" == "true" ]
 	then
-		echo "$1"
-		echo "$2"
-	else
-		return	
+
+		unset $database_json
+		if [ -n "$DBFILE" ]
+		then
+			database_json=', "database":'$(cat "$DBFILE")
+		fi
+
+		debug_data=$(echo '{"old":'$(cat $DEBUGFILE)', "new":{"id":"'$(date +%s)'", "date":"'$(date +%F\ %T)'", "list":"'$list'", "return":'$returned_data$database_json'}}' | jq '[.old[], .new]')
+		echo "$debug_data" > $DEBUGFILE
 	fi
 }
 
@@ -162,14 +168,12 @@ fi
 
 # Remove duplicates from the list.
 list=$(echo $(printf '%s\n' $list | sort -u))
-debug_echo "LIST" "$list"
 
 # Sanitize the list for the fetch url.
 urllist=$(echo $list | sed 's/ /\,/g')
 
 # Fetch the JSON for all followed channels.
 returned_data=$(curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/streams?channel=$urllist&limit=100")
-debug_echo "RETURN" "$returned_data"
 
 # Run the main function for each stream.
 for channel in $list
@@ -180,8 +184,7 @@ done
 # Setup online database.
 [[ $DBFILE ]] && echo "$returned_data" | jq '{online:[.streams[] | {name:.channel.name, game:.channel.game, status:.channel.status}], lastcheck:'$(date +%s)'}' > $DBFILE
 
-[[ -n $DBFILE ]] && debug_echo "DATABASE" "$(cat $DBFILE)"
-debug_echo "END DEBUG" ""
+debug_output
 
 # END PROGRAM
 
