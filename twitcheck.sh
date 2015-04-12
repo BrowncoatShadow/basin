@@ -39,11 +39,15 @@ check_file() {
 		mkdir -p $(dirname $1)
 		touch $1
 	fi
+	if [[ -z $(cat $1) ]]
+	then
+		echo $2 > $1
+	fi
 }
-check_file $DBFILE
+check_file $DBFILE "{}"
 
 # Cleanup: If the database file is older than 2 hours, consider it outdated and remove its contents.
-[[ -s $DBFILE && $(($(date +%s)-$(cat $DBFILE | jq -r '.lastcheck'))) -gt 7200 ]] && echo > $DBFILE
+[[ -s $DBFILE && $(($(date +%s)-$(cat $DBFILE | jq -r '.lastcheck // 0'))) -gt 7200 ]] && echo > $DBFILE
 
 # END BOOTSTRAPPING
 
