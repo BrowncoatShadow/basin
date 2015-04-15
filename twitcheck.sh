@@ -5,13 +5,16 @@
 # BEGIN BOOTSTRAPPING
 
 # Check for flags.
-while getopts ":dl:" opt; do
+while getopts ":c:dl:" opt; do
 	case $opt in
+		c)
+			alt_config="$OPTARG"
+		;;
 		d)
 			debug=true
 		;;
 		l)
-			alt_list=$OPTARG >&2
+			alt_list=$OPTARG
 		;;
 		\?)
 			echo "Invalid option: -$OPTARG" >&2
@@ -26,11 +29,21 @@ PATH=$PATH:/usr/local/bin
 # Figure out the directory this script is living in.
 TC_BASEDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
-# If the settings do not exist yet, create them from a default template.
-[[ -f "$HOME/.config/twitcheckrc" ]] || sed "s#<INSTALL_DIR>#$TC_BASEDIR#g" "$TC_BASEDIR/twitcheckrc.default" > "$HOME/.config/twitcheckrc"
+# Check if alt config file is defined.
+if [[ -n "$alt_config" ]]
+then
+	# Use alt config file if defined.
+	CFGFILE=$alt_config
+else
+	# If the config file does not exist yet, create it from a default template.
+	[[ -f "$HOME/.config/twitcheckrc" ]] || sed "s#<INSTALL_DIR>#$TC_BASEDIR#g" "$TC_BASEDIR/twitcheckrc.default" > "$HOME/.config/twitcheckrc"
 
-# Load settings.
-source $HOME/.config/twitcheckrc
+	# Use defalt config file.
+	CFGFILE=$HOME/.config/twitcheckrc
+fi
+
+# Load our config file.
+source $CFGFILE
 
 # Generate folders and files if they do not exist.
 check_file() {
@@ -130,8 +143,8 @@ main() {
 		if [ $notify == true ]
 		then
 
-			# Send notification by using the module and giving it the arguments.
-			$MODDIR$MODULE "$schannel" "$sgame" "$sstatus" "$slink"
+			# Send notification by using the module and giving it the arguments. Include the config as an environment variable.
+			MOD_CFGFILE="$CFGFILE" $MODDIR$MODULE "$schannel" "$sgame" "$sstatus" "$slink"
 		fi
 	fi
 

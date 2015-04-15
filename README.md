@@ -51,6 +51,8 @@ You will also need to define any settings required for your module of choice. Th
 
 
 ## Flags
+- '-c <rcfile>'
+  - Use alt config file. This will cause the script not to check for, create, or use the default config. Instead it will use the config file given as an argument.
 - `-d`
   - Debug flag. This will cause the script to output useful debug information.
 - `-l "<channel>..."`
