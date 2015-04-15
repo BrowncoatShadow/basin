@@ -1,6 +1,5 @@
 TODO
 ----
-- Add custom config file location flag.
 - Handle bad API returns from twitch gracefully.
   Currently, we load the last status for a channel in case of a fishy return,
   but we still write the returned values to the database. This results in the
