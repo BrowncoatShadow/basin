@@ -27,16 +27,21 @@ MODULE=echo_notify.sh
 
 
 ### PUSHBULLET SETTINGS
+# Note: If PB_URLTARGET and PB_URITARGET are unset, the module will send to all targets.
+# 
 # PB_TOKEN - Pushbullet access token. Find at <https://www.pushbullet.com/account>
 # 	default: PB_TOKEN=
-# PB_TARGET - Pushbullet device ID. Leave blank to push to all devices.
-#	default: PB_TARGET=
-# PB_URI - Change to 'true' to use application URI instead of URL, for launching app instead of website.
+# PB_URLTARGET - Space seperated list of pushbullet device_idens to send the URL to. 
+#	default: PB_URLTARGET=""
+# PB_URITARGET - Space seperated list of pushbullet device_idens to send the URI to. 
+#	default: PB_URLTARGET=""
+# PB_ALLURI - Change to 'true' to use application URI instead of URL when sending to all targets.
 #	default: PB_URI=false
 ###
 PB_TOKEN=
-PB_TARGET=
-PB_URI=false
+PB_URLTARGET=""
+PB_URITARGET=""
+PB_ALLURI=false
 
 
 ### OS X SETTINGS
