@@ -117,7 +117,8 @@ main() {
 		if [[ "$sgame" == null && "$sstatus" == null ]]
 		then
 			# Remove it from the returned json, so we don't even save it to the online db
-			returned_data=$(echo "$returned_data" | jq 'del(.streams[] | select(.channel.name=="'$1'"))')
+			returned_data="$(echo "$returned_data" | jq 'del(.streams[] | select(.channel.name=="'$1'"))')"
+
 			# If the stream was live before, assume the results to be broken, so we don't re-notify.
 			if [ -n "$dbcheck" ]
 			then
@@ -125,7 +126,7 @@ main() {
 				sgame="$(get_db $1 'game')"
 				sstatus="$(get_db $1 'status')"
 				# Re-insert the broken stream
-				returned_data=$(echo "$returned_data" | jq '.streams + [{"channel":{"display_name":"'$1'", "game":"'"$sgame"'","status":"'"$sstatus"'"}}]')
+				returned_data="$(echo "$returned_data" | jq '{"streams": (.streams + [{"channel":{"name":"'$1'", "game":"'"$sgame"'","status":"'"$sstatus"'"}}])}')"
 			else
 				return # Stream was not live, ignore the broken result to not get a null/null notification.
 			fi
