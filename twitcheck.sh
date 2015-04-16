@@ -91,7 +91,7 @@ get_data() {
 
 # Get data from the database
 get_db() {
-	echo $(cat $DBFILE | jq -r '.online[] | select(.name=="'$1'") | .'$2)
+	cat $DBFILE | jq -r '.online[] | select(.name=="'$1'") | .'$2
 }
 
 main() {
