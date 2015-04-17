@@ -86,7 +86,7 @@ debug_output() {
 
 # Get data from the returned json
 get_data() {
-	echo $returned_data | jq -r '.streams[] | select(.channel.name=="'$1'") | .channel.'$2
+	echo "$returned_data" | jq -r '.streams[] | select(.channel.name=="'$1'") | .channel.'$2
 }
 
 # Get data from the database
