@@ -79,7 +79,7 @@ debug_output() {
 			database_json=', "database":'$(cat $DBFILE)
 		fi
 
-		debug_data=$(echo '{"old":'$(cat $DEBUGFILE)', "new":{"id":"'$(date +%s)'", "date":"'$(date +%F\ %T)'", "list":"'$list'", "return":'$returned_data$database_json'}}' | jq '[.old[], .new]')
+		debug_data=$(echo '{"old":'$(cat $DEBUGFILE)', "new":{"id":"'$(date +%s)'", "date":"'$(date +%F\ %T)'", "list":"'$list'", "return":'$debug_return$database_json'}}' | jq '[.old[], .new]')
 		echo "$debug_data" > $DEBUGFILE
 	fi
 }
@@ -193,6 +193,12 @@ urllist=$(echo $list | sed 's/ /\,/g')
 
 # Fetch the JSON for all followed channels.
 returned_data=$(curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/streams?channel=$urllist&limit=100")
+
+# If debug, save an unmodified copy of the return for the debug file.
+if [ "$debug" == "true" ]
+then
+	debug_return="$returned_data"
+fi
 
 # Run the main function for each stream.
 for channel in $list
