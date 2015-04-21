@@ -126,7 +126,7 @@ main() {
 				sgame="$(get_db $1 'game')"
 				sstatus="$(get_db $1 'status')"
 				# Re-insert the broken stream
-				returned_data="$(echo "$returned_data" | jq '{"streams": (.streams + [{"channel":{"name":"'$1'", "game":"'"$sgame"'","status":"'"$(echo "$sstatus" | sed 's/"/\\\"/g')"'"}}])}')"
+				returned_data="$(echo "$returned_data" | jq '{"streams": (.streams + [{"channel":{"name":"'$1'", "game":"'"$sgame"'","status":'"$(echo "$sstatus" | jq -R '.')"'}}])}')"
 			else
 				return # Stream was not live, ignore the broken result to not get a null/null notification.
 			fi
