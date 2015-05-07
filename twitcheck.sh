@@ -5,7 +5,7 @@
 # BEGIN BOOTSTRAPPING
 
 # Check for flags.
-while getopts ":c:dl:" opt; do
+while getopts ":c:dl:i" opt; do
 	case $opt in
 		c)
 			alt_config="$OPTARG"
@@ -15,6 +15,9 @@ while getopts ":c:dl:" opt; do
 		;;
 		l)
 			alt_list=$OPTARG
+		;;
+		i)
+			interactive=true
 		;;
 		\?)
 			echo "Invalid option: -$OPTARG" >&2
@@ -160,8 +163,96 @@ main() {
 
 # BEGIN PROGRAM
 
+# Check if we are supposed to be running in interactive mode.
+if [ "$interactive" == "true" ]
+then
+
+	# Updating bash output. Thanks a lot to <https://stackoverflow.com/questions/27945567/bash-script-overwrite-output-without-filling-scrollback/27946484#27946484>.
+
+	# If we exit with Ctrl-C, exit gracefully and restore normal state.
+	interactive_cleanup()
+	{
+		# Revert black magic, exit the screen and recover old cursor position.
+		stty sane
+		# Exit the screen and recover old cursor position. At this point, all changes done by our script should be reverted.
+		tput rmcup
+		# End the script here, don't query the API at all.
+		exit 0
+	}
+
+	# Our actual output
+	interactive_output()
+	{
+		tput clear
+
+		echo "Streams currently live: (last checked at $(date --date="@$(cat $DBFILE | jq -r '.lastcheck')" "+%H:%M"))"
+		echo "[press q to exit]"
+		echo
+		# Pretty-print the database json
+		cat $DBFILE | jq -r '
+			.online[] |
+			[
+				.name,
+				(
+					.name | length |
+					if . < 8 then
+						"\t\t"
+					else
+						"\t"
+					end
+				),
+				.game,
+				"\nhttp://twitch.tv/", .name,
+				"\n\t\t\t", .status
+			] |
+			add'
+
+	}
+
+	# Black Magic (see stty(1)).
+	# Enables deletion of output, and sets the read timeout so we have immediate reactions.
+	stty -icanon time 0 min 0
+
+	# Saves current position of the cursor, and opens new screen.
+	tput smcup
+
+	# Let's start by displaying our data.
+	interactive_output
+
+	# We have to constantly run the loop to give a fast reaction should the user want to quit,
+	# but we do not want to constantly update the output. Let's keep track of how many iterations
+	# there were and only update every 25 * 0.4 = 10 seconds.
+	i=0
+
+	keypress=''
+	# Run the loop until [q] is pressed.
+	while [ "$keypress" != "q" ]; do
+
+		# We need some kind of timeout so we don't waste CPU time.
+		sleep 0.4
+
+		# Make sure to only update every ten seconds.
+		((i+=1))
+		if [ $i -eq 25 ]
+		then
+			# Output our stuff.
+			interactive_output
+			i=0
+		fi
+
+		# If a button is pressed, read it. Since we set the minimum read length to 0 using stty,
+		# we do not wait for an input here but also accept empty input (i.e. no keys pressed).
+		read keypress
+
+		# Handle Ctrl-C (SIGINT) gracefully and restore the proper prompt.
+		trap interactive_cleanup SIGINT
+	done
+
+	# Reset and exit.
+	interactive_cleanup
+
 # Check if script is using an alternitive channel list.
-if [[ -n "$alt_list" ]]
+elif [[ -n "$alt_list" ]]
 then
 
 	# Use arguments instead of settings rc file and use the echo module.
