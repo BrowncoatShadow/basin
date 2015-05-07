@@ -187,13 +187,14 @@ then
 
 		echo "Streams currently live: (last checked at $(date --date="@$(cat $DBFILE | jq -r '.lastcheck')" "+%H:%M"))"
 		echo "[press q to exit]"
-		echo
+
 		# Pretty-print the database json
-		cat $DBFILE | jq -r '
+		echo -e "$(cat $DBFILE | jq -r '
 			.online[] |
 			[
-				.name,
+				"\n\\033[1;34m", .name, "\\033[0m",
 				(
+					# Properly align the game for shorter channel names
 					.name | length |
 					if . < 8 then
 						"\t\t"
@@ -201,11 +202,12 @@ then
 						"\t"
 					end
 				),
-				.game,
-				"\nhttp://twitch.tv/", .name,
+				"\\033[0;36m", .game, "\\033[0m",
+				"\n\\033[0;32mhttp://twitch.tv/", .name, "\\033[0m",
 				"\n\t\t\t", .status
 			] |
-			add'
+			add')"
+		echo
 
 	}
 
