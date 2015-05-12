@@ -65,13 +65,13 @@ check_file $DBFILE "{}"
 
 # BEGIN FUNCTIONS
 
-# Call the Twitch API
+# Twitch service plugin
 get_channels_twitch() {
 
 	# Use the specified followlist, if set.
 	twitch_list="$TWITCH_FOLLOWLIST"
 
-	# If user is set fetch users follow list and add them to the list.
+	# If user is set, fetch user's follow list and add them to the list.
 	[[ -n $TWITCH_USER ]] && twitch_list="$twitch_list "$(curl -s --header 'Client-ID: '$TWITCH_CLIENT_ID -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/users/$TWITCH_USER/follows/channels?limit=100" | jq -r '.follows[] | .channel.name' | tr '\n' ' ')
 
 	# Remove duplicates from the list.
@@ -81,7 +81,7 @@ get_channels_twitch() {
 	urllist=$(echo $twitch_list | sed 's/ /\,/g')
 
 	# Fetch the JSON for all followed channels.
-	returned_data=$(curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/streams?channel=$urllist&limit=100")
+	returned_data="$(curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/streams?channel=$urllist&limit=100")"
 
 	# Create new database.
 	new_online_json="$(echo "$returned_data" | jq '[.streams[] | {name:.channel.name, game:.channel.game, status:.channel.status, url:.channel.url}]')"
@@ -102,6 +102,41 @@ get_channels_twitch() {
 	echo "$new_online_json"
 }
 
+# Hitbox service plugin
+get_channels_hitbox() {
+
+	# Use the specified followlist, if set.
+	hitbox_list="$HITBOX_FOLLOWLIST"
+
+	# If user is set, fetch user's follow list and add them to the list.
+	[[ -n $HITBOX_USER ]] && hitbox_list="$hitbox_list "$(curl -s -X GET "https://api.hitbox.tv/following/user/?user_name=$HITBOX_USER" | jq -r '.following[] | .user_name' | tr '\n' ' ')
+
+	# Remove duplicates from the list.
+	hitbox_list=$(echo $(printf '%s\n' $hitbox_list | sort -u))
+
+	# Fetch the JSON for all followed channels.
+	new_online_json='[]'
+	for channel in $hitbox_list
+	do
+		returned_data="$(curl -s -X GET "https://api.hitbox.tv/media/live/$channel")"
+
+		is_live="$(echo "$returned_data" | jq -r '.livestream[] | .media_is_live')"
+		if [[ "$is_live" == "1" ]]
+		then
+			# Insert into new database.
+			new_online_json="$(echo "$returned_data" | jq "$new_online_json"' + [{name:.livestream[] | .media_name, game:.livestream[] | .category_name, status:.livestream[] | .media_status, url:.livestream[] | .channel.channel_link}]')"
+		fi
+	done
+
+	# Notify for new streams.
+	for channel in $hitbox_list
+	do
+		check_notify 'hitbox' "$new_online_json" $channel
+	done
+	echo "$new_online_json"
+
+}
+
 # Get data from the database.
 get_db() {
 	cat $DBFILE | jq -r '.'$1'[] | select(.name=="'$2'") | .'$3
@@ -116,14 +151,13 @@ check_notify() {
 
 	# Help function to get a given key.
 	get_data() {
-		echo "$new_online_json" | jq -r '.[] | select(.name="'$channel'") | .'$1
+		echo "$new_online_json" | jq -r '.[] | select(.name=="'$channel'") | .'$1
 	}
 
 	# Check if stream is active.
 	name=$(get_data 'name')
 	if [ "$name" == "$channel" ]
 	then
-
 		# Check if it has been active since last check.
 		[[ -n "$DBFILE" ]] && dbcheck=$(get_db $service $name 'name')
 
@@ -207,7 +241,7 @@ then
 
 		# Pretty-print the database json
 		echo -e "$(cat $DBFILE | jq -r '
-			.twitch[] |
+			(.twitch + .hitbox)[] |
 			[
 				"\n\\033[1;34m", .name, "\\033[0m",
 				(
@@ -278,6 +312,11 @@ else
 	if [[ -n "$TWITCH_USER" || -n "$TWITCH_FOLLOWLIST" ]]
 	then
 		new_online_db="$(get_channels_twitch | jq "$new_online_db + {twitch: .}")"
+	fi
+
+	if [[ -n "$HITBOX_USER" || -n "$HITBOX_FOLLOWLIST" ]]
+	then
+		new_online_db="$(get_channels_hitbox | jq "$new_online_db + {hitbox: .}")"
 	fi
 
 	# Save online database

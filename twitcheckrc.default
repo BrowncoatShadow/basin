@@ -2,12 +2,6 @@
 # twitcheck - A twitch.tv Stream Checker by BrowncoatShadow and Crendgrim
 
 ### GENERAL SETTINGS
-# USER - Your Twitch user in all lower-case letters. If set, use this user's followed channels.
-# 	default: USER=
-# FOLLOWLIST - Additional list of streams to check on, divided by spaces. Useful for watching yourself.
-#	default: FOLLOWLIST=""
-# CLIENT - Twitch client_id, generate at <http://www.twitch.tv/kraken/oauth2/clients/new>.
-#	default: CLIENT=
 # DBFILE - The database file for storing currently online streams.
 #	default: DBFILE=$HOME/.local/share/twitcheck/online.json
 # DEBUGFILE - The file for storing debug data. This can help to debug the script itself.
@@ -17,13 +11,31 @@
 # MODULE - The notification module to use. The order of arguments is $CHANNEL, $GAME, $STATUS, $LINK.
 #	default: MODULE=echo_notify.sh
 ###
-USER=
-FOLLOWLIST=""
-CLIENT=
 DBFILE=$HOME/.local/share/twitcheck/online.json
 DEBUGFILE=$HOME/.local/share/twitcheck/debug.json
 MODDIR=<INSTALL_DIR>/modules/
 MODULE=echo_notify.sh
+
+
+### TWITCH SETTINGS
+# TWITCH_USER - Your Twitch user in all lower-case letters. If set, use this user's followed channels.
+# 	default: TWITCH_USER=
+# TWITCH_FOLLOWLIST - Additional list of streams to check on, divided by spaces. Useful for watching yourself.
+#	default: TWITCH_FOLLOWLIST=""
+# TWITCH_CLIENT_ID - Twitch client_id, generate at <http://www.twitch.tv/kraken/oauth2/clients/new>.
+#	default: TWITCH_CLIENT_ID=
+TWITCH_USER=
+TWITCH_FOLLOWLIST=""
+TWITCH_CLIENT_ID=
+
+
+### HITBOX SETTINGS
+# HITBOX_USER - Your Hitbox user in all lower-case letters. If set, use this user's followed channels.
+#   default: HITBOX_USER=
+# HITBOX_FOLLOWLIST - Additional list of streams to check on, divided by spaces.
+#   default: HITBOX_FOLLOWLIST=""
+HITBOX_USER=
+HITBOX_FOLLOWLIST=""
 
 
 ### PUSHBULLET SETTINGS
