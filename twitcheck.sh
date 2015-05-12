@@ -204,7 +204,7 @@ then
 				),
 				"\\033[0;36m", .game, "\\033[0m",
 				"\n\\033[0;32mhttp://twitch.tv/", .name, "\\033[0m",
-				"\n\t\t\t", .status
+				"\n", .status
 			] |
 			add')"
 		echo
