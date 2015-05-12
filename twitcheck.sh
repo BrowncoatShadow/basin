@@ -5,16 +5,10 @@
 # BEGIN BOOTSTRAPPING
 
 # Check for flags.
-while getopts ":c:dl:i" opt; do
+while getopts ":c:i" opt; do
 	case $opt in
 		c)
 			alt_config="$OPTARG"
-		;;
-		d)
-			debug=true
-		;;
-		l)
-			alt_list=$OPTARG
 		;;
 		i)
 			interactive=true
@@ -71,69 +65,91 @@ check_file $DBFILE "{}"
 
 # BEGIN FUNCTIONS
 
-# Output debug info to file, if requested.
-debug_output() {
-	if [ "$debug" == "true" ]
-	then
+# Call the Twitch API
+get_channels_twitch() {
 
-		unset $database_json
-		if [ -n "$DBFILE" ]
+	# Use the specified followlist, if set.
+	twitch_list="$TWITCH_FOLLOWLIST"
+
+	# If user is set fetch users follow list and add them to the list.
+	[[ -n $TWITCH_USER ]] && twitch_list="$twitch_list "$(curl -s --header 'Client-ID: '$TWITCH_CLIENT_ID -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/users/$TWITCH_USER/follows/channels?limit=100" | jq -r '.follows[] | .channel.name' | tr '\n' ' ')
+
+	# Remove duplicates from the list.
+	twitch_list=$(echo $(printf '%s\n' $twitch_list | sort -u))
+
+	# Sanitize the list for the fetch url.
+	urllist=$(echo $twitch_list | sed 's/ /\,/g')
+
+	# Fetch the JSON for all followed channels.
+	returned_data=$(curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/streams?channel=$urllist&limit=100")
+
+	# Create new database.
+	new_online_json="$(echo "$returned_data" | jq '[.streams[] | {name:.channel.name, game:.channel.game, status:.channel.status, url:.channel.url}]')"
+
+	# Notify for new streams.
+	for channel in $twitch_list
+	do
+		output=$(check_notify 'twitch' "$new_online_json" $channel)
+		# If we get a broken result, replace the old one.
+		if [[ $? != 0 ]]
 		then
-			database_json=', "database":'$(cat $DBFILE)
+			# Remove entry.
+			new_online_json="$(echo "$new_online_json" | jq 'del(.[] | select(.name=="'$channel'"))')"
+			# Re-insert recovered entry.
+			new_online_json="$(echo "$new_online_json" | jq '. + ['"$output"']')"
 		fi
-
-		debug_data=$(echo '{"old":'$(cat $DEBUGFILE)', "new":{"id":"'$(date +%s)'", "date":"'$(date +%F\ %T)'", "list":"'$list'", "return":'$debug_return$database_json'}}' | jq '[.old[], .new]')
-		echo "$debug_data" > $DEBUGFILE
-	fi
+	done
+	echo "$new_online_json"
 }
 
-# Get data from the returned json
-get_data() {
-	echo "$returned_data" | jq -r '.streams[] | select(.channel.name=="'$1'") | .channel.'$2
-}
-
-# Get data from the database
+# Get data from the database.
 get_db() {
-	cat $DBFILE | jq -r '.online[] | select(.name=="'$1'") | .'$2
+	cat $DBFILE | jq -r '.'$1'[] | select(.name=="'$2'") | .'$3
 }
 
-main() {
+# Main function: Check differences between old and new online list and notify accordingly.
+check_notify() {
+
+	service="$1"
+	new_online_json="$2"
+	channel="$3"
+
+	# Help function to get a given key.
+	get_data() {
+		echo "$new_online_json" | jq -r '.[] | select(.name="'$channel'") | .'$1
+	}
 
 	# Check if stream is active.
-	name=$(get_data $1 'name')
-
-	if [ "$name" == "$1" ]
+	name=$(get_data 'name')
+	if [ "$name" == "$channel" ]
 	then
 
 		# Check if it has been active since last check.
-		[[ -n "$DBFILE" ]] && dbcheck=$(get_db $1 'name')
+		[[ -n "$DBFILE" ]] && dbcheck=$(get_db $service $name 'name')
 
 		notify=true
 
 		# Grab important info from JSON check.
-		schannel="$(get_data $1 'display_name')"
-		sgame="$(get_data $1 'game')"
-		slink="$(get_data $1 'url')"
-		sstatus="$(get_data $1 'status')"
+		sgame="$(get_data 'game')"
+		slink="$(get_data 'url')"
+		sstatus="$(get_data 'status')"
 
 		# Sometimes, the API sends broken results. Handle these gracefully.
 		if [[ "$sgame" == null && "$sstatus" == null ]]
 		then
-			# Remove it from the returned json, so we don't even save it to the online db
-			returned_data="$(echo "$returned_data" | jq 'del(.streams[] | select(.channel.name=="'$1'"))')"
 
 			# If the stream was live before, assume the results to be broken, so we don't re-notify.
 			if [ -n "$dbcheck" ]
 			then
 				# Recover the old data
-				sgame="$(get_db $1 'game')"
-				sstatus="$(get_db $1 'status')"
-				slink="$(get_db $1 'url')"
-				# Re-insert the broken stream
-				returned_data="$(echo "$returned_data" | jq '{"streams": (.streams + [{"channel":{"name":"'$1'", "game":"'"$sgame"'", "status":'"$(echo "$sstatus" | jq -R '.')"', "url": "'"$slink"'"}}])}')"
-			else
-				return # Stream was not live, ignore the broken result to not get a null/null notification.
+				sgame="$(get_db $service $name 'game')"
+				sstatus="$(get_db $service $name 'status')"
+				slink="$(get_db $service $name 'url')"
+				# Output the broken stream
+				echo null | jq '{"name":"'$name'", "game":"'"$sgame"'", "status":'"$(echo "$sstatus" | jq -R '.')"', "url": "'"$slink"'"}'
 			fi
+
+			return -1 # Otherwise ignore the broken result to not get a null/null notification.
 		fi
 
 		# Already streaming last time, check for updates
@@ -142,8 +158,8 @@ main() {
 
 			notify=false
 
-			dbgame="$(get_db $1 'game')"
-			dbstatus="$(get_db $1 'status')"
+			dbgame="$(get_db $service $name 'game')"
+			dbstatus="$(get_db $service $name 'status')"
 
 			# Notify when game or status change
 			[[ "$dbgame" != "$sgame" || "$dbstatus" != "$sstatus" ]] && notify=true
@@ -153,7 +169,7 @@ main() {
 		then
 
 			# Send notification by using the module and giving it the arguments. Include the config as an environment variable.
-			MOD_CFGFILE="$CFGFILE" $MODDIR$MODULE "$schannel" "$sgame" "$sstatus" "$slink"
+			MOD_CFGFILE="$CFGFILE" $MODDIR$MODULE "$name" "$sgame" "$sstatus" "$slink"
 		fi
 	fi
 
@@ -191,7 +207,7 @@ then
 
 		# Pretty-print the database json
 		echo -e "$(cat $DBFILE | jq -r '
-			.online[] |
+			.twitch[] |
 			[
 				"\n\\033[1;34m", .name, "\\033[0m",
 				(
@@ -254,56 +270,20 @@ then
 	# Reset and exit.
 	interactive_cleanup
 
-# Check if script is using an alternitive channel list.
-elif [[ -n "$alt_list" ]]
-then
-
-	# Use arguments instead of settings rc file and use the echo module.
-	list="$alt_list"
-	MODULE=echo_notify.sh
-	unset DBFILE
 else
 
+	new_online_db='{}'
+
 	# Check if we have a user set or any channels to follow.
-	if [[ -z "$USER" && -z "$FOLLOWLIST" ]]
+	if [[ -n "$TWITCH_USER" || -n "$TWITCH_FOLLOWLIST" ]]
 	then
-		>&2 echo "You have to supply a user to fetch followed channels from, or set a FOLLOWLIST in the config!"
-		>&2 echo "The configuration file can be found at $HOME/.config/twitcheckrc"
-		exit 1
-	else
-		# Use the specified followlist, if set.
-		list="$FOLLOWLIST"
-
-		# If user is set fetch users follow list and add them to the list.
-		[[ -n $USER ]] && list="$list "$(curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/users/$USER/follows/channels?limit=100" | jq -r '.follows[] | .channel.name' | tr '\n' ' ')
+		new_online_db="$(get_channels_twitch | jq "$new_online_db + {twitch: .}")"
 	fi
+
+	# Save online database
+	[[ -n "$DBFILE" ]] && echo "$new_online_db" | jq '. + {lastcheck:'$(date +%s)'}' > $DBFILE
+
 fi
-
-# Remove duplicates from the list.
-list=$(echo $(printf '%s\n' $list | sort -u))
-
-# Sanitize the list for the fetch url.
-urllist=$(echo $list | sed 's/ /\,/g')
-
-# Fetch the JSON for all followed channels.
-returned_data=$(curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/streams?channel=$urllist&limit=100")
-
-# If debug, save an unmodified copy of the return for the debug file.
-if [ "$debug" == "true" ]
-then
-	debug_return="$returned_data"
-fi
-
-# Run the main function for each stream.
-for channel in $list
-do
-	main $channel
-done
-
-# Setup online database.
-[[ -n "$DBFILE" ]] && echo "$returned_data" | jq '{online:[.streams[] | {name:.channel.name, game:.channel.game, status:.channel.status, url:.channel.url}], lastcheck:'$(date +%s)'}' > $DBFILE
-
-debug_output
 
 # END PROGRAM
 
