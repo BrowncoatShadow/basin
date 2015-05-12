@@ -128,8 +128,9 @@ main() {
 				# Recover the old data
 				sgame="$(get_db $1 'game')"
 				sstatus="$(get_db $1 'status')"
+				slink="$(get_db $1 'url')"
 				# Re-insert the broken stream
-				returned_data="$(echo "$returned_data" | jq '{"streams": (.streams + [{"channel":{"name":"'$1'", "game":"'"$sgame"'","status":'"$(echo "$sstatus" | jq -R '.')"'}}])}')"
+				returned_data="$(echo "$returned_data" | jq '{"streams": (.streams + [{"channel":{"name":"'$1'", "game":"'"$sgame"'", "status":'"$(echo "$sstatus" | jq -R '.')"', "url": "'"$slink"'"}}])}')"
 			else
 				return # Stream was not live, ignore the broken result to not get a null/null notification.
 			fi
@@ -203,7 +204,7 @@ then
 					end
 				),
 				"\\033[0;36m", .game, "\\033[0m",
-				"\n\\033[0;32mhttp://twitch.tv/", .name, "\\033[0m",
+				"\n\\033[0;32m", .url, "\\033[0m",
 				"\n", .status
 			] |
 			add')"
@@ -300,7 +301,7 @@ do
 done
 
 # Setup online database.
-[[ -n "$DBFILE" ]] && echo "$returned_data" | jq '{online:[.streams[] | {name:.channel.name, game:.channel.game, status:.channel.status}], lastcheck:'$(date +%s)'}' > $DBFILE
+[[ -n "$DBFILE" ]] && echo "$returned_data" | jq '{online:[.streams[] | {name:.channel.name, game:.channel.game, status:.channel.status, url:.channel.url}], lastcheck:'$(date +%s)'}' > $DBFILE
 
 debug_output
 
