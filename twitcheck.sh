@@ -58,7 +58,7 @@ check_file $DBFILE "{}"
 [[ "$debug" == "true" ]] && check_file $DEBUGFILE "[]"
 
 # Cleanup: If the database file is older than 2 hours, consider it outdated and remove its contents.
-[[ -s $DBFILE && $(($(date +%s)-$(cat $DBFILE | jq -r '.lastcheck // 0'))) -gt 7200 ]] && echo > $DBFILE
+[[ -s $DBFILE && $(($(date +%s)-$(cat $DBFILE | jq -r '.lastcheck // 0'))) -gt 7200 ]] && echo "{}" > $DBFILE
 
 # END BOOTSTRAPPING
 
@@ -142,7 +142,7 @@ get_db() {
 	cat $DBFILE | jq -r '.'$1'[] | select(.name=="'$2'") | .'$3
 }
 
-# Main function: Check differences between old and new online list and notify accordingly.
+# Notification function: Check differences between old and new online list and notify accordingly.
 check_notify() {
 
 	service="$1"
@@ -209,6 +209,27 @@ check_notify() {
 
 }
 
+# Main function
+main() {
+
+	new_online_db='{}'
+
+	# Check if we have a user set or any channels to follow.
+	if [[ -n "$TWITCH_USER" || -n "$TWITCH_FOLLOWLIST" ]]
+	then
+		new_online_db="$(get_channels_twitch | jq "$new_online_db + {twitch: .}")"
+	fi
+
+	if [[ -n "$HITBOX_USER" || -n "$HITBOX_FOLLOWLIST" ]]
+	then
+		new_online_db="$(get_channels_hitbox | jq "$new_online_db + {hitbox: .}")"
+	fi
+
+	# Save online database
+	[[ -n "$DBFILE" ]] && echo "$new_online_db" | jq '. + {lastcheck:'$(date +%s)'}' > $DBFILE
+
+}
+
 # END FUNCTIONS
 
 
@@ -236,7 +257,14 @@ then
 	{
 		tput clear
 
-		echo "Streams currently live: (last checked at $(date --date="@$(cat $DBFILE | jq -r '.lastcheck')" "+%H:%M"))"
+		last_checked=$(cat $DBFILE | jq -r '.lastcheck // 0')
+		if [ $last_checked -eq 0 ]
+		then
+			echo "Database too old, updating..."
+			main
+			last_checked=$(cat $DBFILE | jq -r '.lastcheck')
+		fi
+		echo "Streams currently live: (last checked at $(date --date="@$last_checked" "+%H:%M"))"
 		echo "[press q to exit]"
 
 		# Pretty-print the database json
@@ -306,21 +334,8 @@ then
 
 else
 
-	new_online_db='{}'
-
-	# Check if we have a user set or any channels to follow.
-	if [[ -n "$TWITCH_USER" || -n "$TWITCH_FOLLOWLIST" ]]
-	then
-		new_online_db="$(get_channels_twitch | jq "$new_online_db + {twitch: .}")"
-	fi
-
-	if [[ -n "$HITBOX_USER" || -n "$HITBOX_FOLLOWLIST" ]]
-	then
-		new_online_db="$(get_channels_hitbox | jq "$new_online_db + {hitbox: .}")"
-	fi
-
-	# Save online database
-	[[ -n "$DBFILE" ]] && echo "$new_online_db" | jq '. + {lastcheck:'$(date +%s)'}' > $DBFILE
+	# Run the main program.
+	main
 
 fi
 
