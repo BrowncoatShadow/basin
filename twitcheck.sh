@@ -131,7 +131,7 @@ get_channels_hitbox() {
 	# Notify for new streams.
 	for channel in $hitbox_list
 	do
-		check_notify 'hitbox' "$new_online_json" $channel
+		check_notify 'hitbox' "$new_online_json" ${channel,,}
 	done
 	echo "$new_online_json"
 
@@ -139,7 +139,7 @@ get_channels_hitbox() {
 
 # Get data from the database.
 get_db() {
-	cat $DBFILE | jq -r '.'$1'[] | select(.name=="'$2'") | .'$3
+	cat $DBFILE | jq -r '(.'$1' // [])[] | select(.name=="'$2'") | .'$3
 }
 
 # Notification function: Check differences between old and new online list and notify accordingly.
