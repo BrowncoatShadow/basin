@@ -84,7 +84,7 @@ get_channels_twitch() {
 	returned_data="$(curl -s --header 'Client-ID: '$CLIENT -H 'Accept: application/vnd.twitchtv.v3+json' -X GET "https://api.twitch.tv/kraken/streams?channel=$urllist&limit=100")"
 
 	# Create new database.
-	new_online_json="$(echo "$returned_data" | jq '[.streams[] | {name:.channel.name, game:.channel.game, status:.channel.status, url:.channel.url}]')"
+	new_online_json="$(echo "$returned_data" | jq '[.streams[] | {name:.channel.name, display_name:.channel.display_name, game:.channel.game, status:.channel.status, url:.channel.url}]')"
 
 	# Notify for new streams.
 	for channel in $twitch_list
@@ -124,7 +124,7 @@ get_channels_hitbox() {
 		if [[ "$is_live" == "1" ]]
 		then
 			# Insert into new database.
-			new_online_json="$(echo "$returned_data" | jq "$new_online_json"' + [{name:.livestream[] | .media_name, game:.livestream[] | .category_name, status:.livestream[] | .media_status, url:.livestream[] | .channel.channel_link}]')"
+			new_online_json="$(echo "$returned_data" | jq "$new_online_json"' + [{name:.livestream[] | .media_name, display_name:.livestream[] | .media_display_name, game:.livestream[] | .category_name, status:.livestream[] | .media_status, url:.livestream[] | .channel.channel_link}]')"
 		fi
 	done
 
@@ -164,6 +164,7 @@ check_notify() {
 		notify=true
 
 		# Grab important info from JSON check.
+		sdisplay_name="$(get_data 'display_name')"
 		sgame="$(get_data 'game')"
 		slink="$(get_data 'url')"
 		sstatus="$(get_data 'status')"
@@ -176,11 +177,12 @@ check_notify() {
 			if [ -n "$dbcheck" ]
 			then
 				# Recover the old data
+				sdisplay_name="$(get_db $service $name 'display_name')"
 				sgame="$(get_db $service $name 'game')"
 				sstatus="$(get_db $service $name 'status')"
 				slink="$(get_db $service $name 'url')"
 				# Output the broken stream
-				echo null | jq '{"name":"'$name'", "game":"'"$sgame"'", "status":'"$(echo "$sstatus" | jq -R '.')"', "url": "'"$slink"'"}'
+				echo null | jq '{"name":"'$name'", "display_name":"'$sdisplay_name'", "game":"'"$sgame"'", "status":'"$(echo "$sstatus" | jq -R '.')"', "url": "'"$slink"'"}'
 			fi
 
 			return -1 # Otherwise ignore the broken result to not get a null/null notification.
@@ -203,7 +205,7 @@ check_notify() {
 		then
 
 			# Send notification by using the module and giving it the arguments. Include the config as an environment variable.
-			MOD_CFGFILE="$CFGFILE" $MODDIR$MODULE "$name" "$sgame" "$sstatus" "$slink"
+			MOD_CFGFILE="$CFGFILE" $MODDIR$MODULE "$sdisplay_name" "$sgame" "$sstatus" "$slink"
 		fi
 	fi
 
@@ -271,10 +273,10 @@ then
 		echo -e "$(cat $DBFILE | jq -r '
 			(.twitch + .hitbox)[] |
 			[
-				"\n\\033[1;34m", .name, "\\033[0m",
+				"\n\\033[1;34m", .display_name, "\\033[0m",
 				(
 					# Properly align the game for shorter channel names
-					.name | length |
+					.display_name | length |
 					if . < 8 then
 						"\t\t"
 					else
