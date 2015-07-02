@@ -120,8 +120,21 @@ get_channels_hitbox() {
 	do
 		returned_data="$(curl -s -X GET "https://api.hitbox.tv/media/live/$channel")"
 
-		is_live="$(echo "$returned_data" | jq -r '.livestream[] | .media_is_live')"
-		if [[ "$is_live" == "1" ]]
+		# Sometimes the hitbox API returns garbage. If that happens, handle it gracefully.
+		is_live="$(echo "$returned_data" | jq -r '.livestream[] | .media_is_live' 2>/dev/null)"
+		if [[ $? == 4 ]]
+		then
+			# Insert entry recovered from database.
+			sdisplay_name="$(get_db 'hitbox' $channel 'display_name')"
+			# Did it even exist in the database?
+			if [[ -n "$sdisplay_name" ]]
+			then
+				sgame="$(get_db 'hitbox' $channel 'game')"
+				sstatus="$(get_db 'hitbox' $channel 'status')"
+				slink="$(get_db 'hitbox' $channel 'url')"
+				new_online_json="$(echo '[{"name":"'$name'", "display_name":"'$sdisplay_name'", "game":"'"$sgame"'", "status":'"$(echo "$sstatus" | jq -R '.')"', "url": "'"$slink"'"}]' | jq "$new_online_json"' + .')"
+			fi
+		elif [[ "$is_live" == "1" ]]
 		then
 			# Insert into new database.
 			new_online_json="$(echo "$returned_data" | jq "$new_online_json"' + [{name:.livestream[] | .media_name, display_name:.livestream[] | .media_display_name, game:.livestream[] | .category_name, status:.livestream[] | .media_status, url:.livestream[] | .channel.channel_link}]')"
