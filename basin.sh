@@ -1,5 +1,5 @@
 #!/bin/bash
-# twitcheck - A twitch.tv Stream Checker by BrowncoatShadow and Crendgrim
+# basin.sh - A bash script that collects all the streams you care about in one place. by BrowncoatShadow and Crendgrim
 
 
 # BEGIN BOOTSTRAPPING
@@ -33,10 +33,10 @@ then
 	CFGFILE=$alt_config
 else
 	# If the config file does not exist yet, create it from a default template.
-	[[ -f "$HOME/.config/twitcheckrc" ]] || sed "s#<INSTALL_DIR>#$TC_BASEDIR#g" "$TC_BASEDIR/twitcheckrc.default" > "$HOME/.config/twitcheckrc"
+	[[ -f "$HOME/.config/basinrc" ]] || sed "s#<INSTALL_DIR>#$TC_BASEDIR#g" "$TC_BASEDIR/basinrc.default" > "$HOME/.config/basinrc"
 
 	# Use defalt config file.
-	CFGFILE=$HOME/.config/twitcheckrc
+	CFGFILE=$HOME/.config/basinrc
 fi
 
 # Load our config file.
