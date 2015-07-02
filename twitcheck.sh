@@ -218,7 +218,7 @@ check_notify() {
 		then
 
 			# Send notification by using the module and giving it the arguments. Include the config as an environment variable.
-			MOD_CFGFILE="$CFGFILE" $MODDIR$MODULE "$sdisplay_name" "$sgame" "$sstatus" "$slink"
+			MOD_CFGFILE="$CFGFILE" $MODDIR$MODULE "$sdisplay_name" "$sgame" "$sstatus" "$slink" "$service"
 		fi
 	fi
 
