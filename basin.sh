@@ -5,10 +5,14 @@
 # BEGIN BOOTSTRAPPING
 
 # Check for flags.
-while getopts ":c:i" opt; do
+while getopts ":c:C:i" opt; do
 	case $opt in
 		c)
 			alt_config="$OPTARG"
+		;;
+		C)
+			create_config=true
+			create_config_file="$OPTARG"
 		;;
 		i)
 			interactive=true
@@ -25,6 +29,82 @@ PATH=$PATH:/usr/local/bin
 
 # Figure out the directory this script is living in.
 TC_BASEDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+
+# BEGIN CONFIGFILE
+# Create a default config file if -C was called.
+if [ "$create_config" == true ]
+then
+	if [[ -z "$create_config_file" ]]
+	then
+		create_config_file="$HOME/.config/basinrc"
+	fi
+	cat > $create_config_file <<"CONFIG"
+#!/bin/bash
+# basin.sh - A bash script that collects all the streams you care about in one place. by BrowncoatShadow and Crendgrim
+
+### GENERAL SETTINGS
+# DBFILE - The database file for storing currently online streams.
+#	default: DBFILE=$HOME/.local/share/basin/online.json
+# DEBUGFILE - The file for storing debug data. This can help to debug the script itself.
+#	default: DEBUGFILE=$HOME/.local/share/basin/debug.json
+# MODDIR - The directory that modules are stored in.
+#	default: MODDIR=<INSTALL_DIR>/modules/
+# MODULE - The notification module to use. The order of arguments is $CHANNEL, $GAME, $STATUS, $LINK.
+#	default: MODULE=echo_notify.sh
+###
+DBFILE=$HOME/.local/share/basin/online.json
+DEBUGFILE=$HOME/.local/share/basin/debug.json
+MODDIR=<INSTALL_DIR>/modules/
+MODULE=echo_notify.sh
+
+
+### TWITCH SETTINGS
+# TWITCH_USER - Your Twitch user in all lower-case letters. If set, use this user's followed channels.
+# 	default: TWITCH_USER=
+# TWITCH_FOLLOWLIST - Additional list of streams to check on, divided by spaces. Useful for watching yourself.
+#	default: TWITCH_FOLLOWLIST=""
+# TWITCH_CLIENT_ID - Twitch client_id, generate at <http://www.twitch.tv/kraken/oauth2/clients/new>.
+#	default: TWITCH_CLIENT_ID=
+TWITCH_USER=
+TWITCH_FOLLOWLIST=""
+TWITCH_CLIENT_ID=
+
+
+### HITBOX SETTINGS
+# HITBOX_USER - Your Hitbox user in all lower-case letters. If set, use this user's followed channels.
+#   default: HITBOX_USER=
+# HITBOX_FOLLOWLIST - Additional list of streams to check on, divided by spaces.
+#   default: HITBOX_FOLLOWLIST=""
+HITBOX_USER=
+HITBOX_FOLLOWLIST=""
+
+
+### PUSHBULLET SETTINGS
+# Note: If PB_URLTARGET and PB_URITARGET are unset, the module will send to all targets.
+# 
+# PB_TOKEN - Pushbullet access token. Find at <https://www.pushbullet.com/account>
+# 	default: PB_TOKEN=
+# PB_URLTARGET - Space seperated list of pushbullet device_idens to send the URL to. 
+#	default: PB_URLTARGET=""
+# PB_URITARGET - Space seperated list of pushbullet device_idens to send the URI to. 
+#	default: PB_URLTARGET=""
+# PB_ALLURI - Change to 'true' to use application URI instead of URL when sending to all targets.
+#	default: PB_URI=false
+###
+PB_TOKEN=
+PB_URLTARGET=""
+PB_URITARGET=""
+PB_ALLURI=false
+
+
+### OS X SETTINGS
+# OSX_TERMNOTY - Set to 'true' to use terminal-notifier app instead of applescript. This enables clicking the notification to launch URL.
+#	default: OSX_TERMNOTY=false
+###
+OSX_TERMNOTY=false
+CONFIG
+fi
+# END CONFIGFILE
 
 # Check if alt config file is defined.
 if [[ -n "$alt_config" ]]
