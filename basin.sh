@@ -42,8 +42,6 @@ then
 #	default: DBFILE=$HOME/.local/share/basin/online.json
 # DEBUGFILE - The file for storing debug data. This can help to debug the script itself.
 #	default: DEBUGFILE=$HOME/.local/share/basin/debug.json
-# MODDIR - The directory that modules are stored in.
-#	default: MODDIR=<INSTALL_DIR>/modules/
 # MODULE - The notification module to use. The order of arguments is $CHANNEL, $GAME, $STATUS, $LINK.
 #	default: MODULE=echo_notify
 ###
@@ -109,7 +107,7 @@ then
 	CFGFILE=$alt_config
 else
 	# If the config file does not exist yet, create it from a default template.
-	[[ -f "$HOME/.config/basinrc" ]] || echo "You need a config file. Try the flag -C."; exit 1
+	[[ -f "$HOME/.config/basinrc" ]] || echo "ERROR basinrc file is missing. Create one with the -C flag."; exit 1
 
 	# Use defalt config file.
 	CFGFILE=$HOME/.config/basinrc
