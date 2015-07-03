@@ -50,12 +50,11 @@ then
 # MODDIR - The directory that modules are stored in.
 #	default: MODDIR=<INSTALL_DIR>/modules/
 # MODULE - The notification module to use. The order of arguments is $CHANNEL, $GAME, $STATUS, $LINK.
-#	default: MODULE=echo_notify.sh
+#	default: MODULE=echo_notify
 ###
 DBFILE=$HOME/.local/share/basin/online.json
 DEBUGFILE=$HOME/.local/share/basin/debug.json
-MODDIR=<INSTALL_DIR>/modules/
-MODULE=echo_notify.sh
+MODULE=echo_notify
 
 
 ### TWITCH SETTINGS
@@ -163,12 +162,12 @@ osx_notifiy() {
 	then
 
 		# Send using terminal-notifier
-		terminal-notifier -message "$3" -title "Twitch" -subtitle "$1 is now streaming $2" -open "$4"
+		terminal-notifier -message "$3" -title "basin.sh" -subtitle "$1 is now streaming $2" -open "$4"
 
 	else
 
 		# Send using OS X applescript (no URL support)
-		osascript -e "display notification \"$3\" with title \"Twitch\" subtitle \"$1 is now streaming $2\""
+		osascript -e "display notification \"$3\" with title \"basin.sh\" subtitle \"$1 is now streaming $2\""
 	fi
 }
 
@@ -382,8 +381,8 @@ check_notify() {
 		if [ $notify == true ]
 		then
 
-			# Send notification by using the module and giving it the arguments. Include the config as an environment variable.
-			MOD_CFGFILE="$CFGFILE" $MODDIR$MODULE "$sdisplay_name" "$sgame" "$sstatus" "$slink" "$service"
+			# Send notification by using the module and giving it the arguments.
+			$MODULE "$sdisplay_name" "$sgame" "$sstatus" "$slink" "$service"
 		fi
 	fi
 
