@@ -33,6 +33,17 @@ TC_BASEDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 # Create a default config file if -C was called.
 if [[ "$create_config" == "true" ]]
 then
+	# If the file exists already, ask the user if he really wants to replace it.
+	if [[ -f "$HOME/.config/basinrc" ]]
+	then
+		read -p "The configuration file \`$HOME/.config/basinrc\` exists already. Are you sure you want to replace it? [y/N] " prompt
+		if [[ $prompt != "y" && $prompt != "Y" && $prompt != "yes" && $prompt != "YES" ]]
+		then
+			echo "Aborting."
+			exit 0
+		fi
+	fi
+
 	cat > $HOME/.config/basinrc <<"CONFIG"
 #!/bin/bash
 # basin.sh - A bash script that collects all the streams you care about in one place. by BrowncoatShadow and Crendgrim
