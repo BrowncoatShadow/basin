@@ -204,7 +204,7 @@ pb_notify() {
 	# Make sure we have a token.
 	if [[ -z "$PB_TOKEN" ]]
 	then
-		echo "ERROR You need to set PB_TOKEN in your settings file." >&2
+		echo "[ERROR] You need to set PB_TOKEN in your settings file." >&2
 		exit 1
 	fi
 	
