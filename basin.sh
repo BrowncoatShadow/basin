@@ -112,7 +112,7 @@ fi
 if [[ -n "$alt_config" ]]
 then
 	# If the config file does not exist yet, exit with a descriptive error message.
-	if [[ ! -f "$HOME/.config/basinrc" ]]
+	if [[ ! -f "$alt_config" ]]
 	then
 		echo "[ERROR] The specified configuration file $alt_config is missing." >&2
 		echo "[ERROR] You can create it by copying the default configuration file at \`$HOME/.config/basinrc\`." >&2
