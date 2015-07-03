@@ -17,7 +17,7 @@ while getopts ":c:Ci" opt; do
 			interactive=true
 		;;
 		\?)
-			echo "Invalid option: -$OPTARG" >&2
+			echo "[ERROR] Invalid option: -$OPTARG" >&2
 			exit 1
 		;;
 	esac
