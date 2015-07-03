@@ -49,8 +49,9 @@ then
 # DBFILE - The database file for storing currently online streams.
 #	default: DBFILE=$HOME/.local/share/basin/online.json
 # DEBUGFILE - The file for storing debug data. This can help to debug the script itself.
+#	NOTE: This functionality is currently broken.
 #	default: DEBUGFILE=$HOME/.local/share/basin/debug.json
-# MODULE - The notification module to use. The order of arguments is $CHANNEL, $GAME, $STATUS, $LINK.
+# MODULE - The notification module to use.
 #	default: MODULE=echo_notify
 ###
 DBFILE=$HOME/.local/share/basin/online.json
