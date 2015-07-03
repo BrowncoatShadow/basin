@@ -52,7 +52,7 @@ MODULE=echo_notify
 
 ### TWITCH SETTINGS
 # TWITCH_USER - Your Twitch user in all lower-case letters. If set, use this user's followed channels.
-# 	default: TWITCH_USER=
+#	default: TWITCH_USER=
 # TWITCH_FOLLOWLIST - Additional list of streams to check on, divided by spaces. Useful for watching yourself.
 #	default: TWITCH_FOLLOWLIST=""
 # TWITCH_CLIENT_ID - Twitch client_id, generate at <http://www.twitch.tv/kraken/oauth2/clients/new>.
@@ -64,18 +64,18 @@ TWITCH_CLIENT_ID=
 
 ### HITBOX SETTINGS
 # HITBOX_USER - Your Hitbox user in all lower-case letters. If set, use this user's followed channels.
-#   default: HITBOX_USER=
+#	default: HITBOX_USER=
 # HITBOX_FOLLOWLIST - Additional list of streams to check on, divided by spaces.
-#   default: HITBOX_FOLLOWLIST=""
+#	default: HITBOX_FOLLOWLIST=""
 HITBOX_USER=
 HITBOX_FOLLOWLIST=""
 
 
 ### PUSHBULLET SETTINGS
 # Note: If PB_URLTARGET and PB_URITARGET are unset, the module will send to all targets.
-# 
+#
 # PB_TOKEN - Pushbullet access token. Find at <https://www.pushbullet.com/account>
-# 	default: PB_TOKEN=
+#	default: PB_TOKEN=
 # PB_URLTARGET - Space seperated list of pushbullet device_idens to send the URL to. 
 #	default: PB_URLTARGET=""
 # PB_URITARGET - Space seperated list of pushbullet device_idens to send the URI to. 
@@ -100,20 +100,30 @@ CONFIG
 fi
 # END CONFIGFILE
 
-# Check if alt config file is defined.
+# Check if alternative config file is defined.
 if [[ -n "$alt_config" ]]
 then
-	# Use alt config file if defined.
-	CFGFILE=$alt_config
-else
-	# If the config file does not exist yet, create it from a default template.
+	# If the config file does not exist yet, exit with a descriptive error message.
 	if [[ ! -f "$HOME/.config/basinrc" ]]
 	then
-		echo "ERROR basinrc file is missing. Create one with the -C flag."
+		echo "[ERROR] The specified configuration file $alt_config is missing." >&2
+		echo "[ERROR] You can create it by copying the default configuration file at \`$HOME/.config/basinrc\`." >&2
+		echo "[ERROR] If that file does not exist, you can create it by calling \`basin.sh -C\`." >&2
 		exit 1
 	fi
 
-	# Use defalt config file.
+	# Use alt config file if defined.
+	CFGFILE=$alt_config
+else
+	# If the config file does not exist yet, exit with a descriptive error message.
+	if [[ ! -f "$HOME/.config/basinrc" ]]
+	then
+		echo "[ERROR] The default configuration file $HOME/.config/basinrc is missing." >&2
+		echo "[ERROR] You can create it by calling \`basin.sh -C\`." >&2
+		exit 1
+	fi
+
+	# Use default config file.
 	CFGFILE=$HOME/.config/basinrc
 fi
 
@@ -144,9 +154,19 @@ check_file $DBFILE "{}"
 # BEGIN FUNCTIONS
 
 # BEGIN NOTIFIERS
+
+# These are the functions that are called whenever a stream changes its status to execute the
+# user-visible notification.
+# Each notifier gets the following parameter:
+#  $1: The display name of the stream. Must not be the username, but is the user-facing channel name.
+#  $2: The game that is currently being played. Can be empty.
+#  $3: The channel's status text, a descriptive caption set by the broadcaster.
+#  $4: The link to the channel, correctly formatted for the service.
+#  $5: The service the livestream is on.
+
 # Echo notifier.
 echo_notify() {
-	echo "$1 [$2]: $3 <$4>"
+	echo "$5 | $1 [$2]: $3 <$4>"
 }
 
 # Kdialog notifier.
@@ -224,9 +244,18 @@ pb_notify() {
 		done
 	fi
 }
+
 # END NOTIFIERS
 
+
 # BEGIN SERVICES
+
+# The plugins for the different streaming services. These functions are responsible for fetching
+# data from the foreign APIs, parsing this data and calling `check_notify` for any live streams.
+# That function will then decide whether to send a notification.
+# Also, these plugins will output all current live channels as JSON, which then gets accumulated
+# and saved into the database file.
+
 # Twitch service plugin
 get_channels_twitch() {
 
@@ -311,7 +340,9 @@ get_channels_hitbox() {
 	echo "$new_online_json"
 
 }
-#END SERVICES
+
+# END SERVICES
+
 
 # Get data from the database.
 get_db() {
@@ -352,19 +383,21 @@ check_notify() {
 			# If the stream was live before, assume the results to be broken, so we don't re-notify.
 			if [ -n "$dbcheck" ]
 			then
-				# Recover the old data
+				# Recover the old data.
 				sdisplay_name="$(get_db $service $name 'display_name')"
 				sgame="$(get_db $service $name 'game')"
 				sstatus="$(get_db $service $name 'status')"
 				slink="$(get_db $service $name 'url')"
-				# Output the broken stream
+				# Output the broken stream.
+				# This output can be used by the service plugins to replace the broken record,
+				# so it does not show up in the database.
 				echo null | jq '{"name":"'$name'", "display_name":"'$sdisplay_name'", "game":"'"$sgame"'", "status":'"$(echo "$sstatus" | jq -R '.')"', "url": "'"$slink"'"}'
 			fi
 
 			return -1 # Otherwise ignore the broken result to not get a null/null notification.
 		fi
 
-		# Already streaming last time, check for updates
+		# Already streaming last time, check for updates.
 		if [ -n "$dbcheck" ]
 		then
 
@@ -373,7 +406,7 @@ check_notify() {
 			dbgame="$(get_db $service $name 'game')"
 			dbstatus="$(get_db $service $name 'status')"
 
-			# Notify when game or status change
+			# Notify when game or status change.
 			[[ "$dbgame" != "$sgame" || "$dbstatus" != "$sstatus" ]] && notify=true
 		fi
 
@@ -387,7 +420,9 @@ check_notify() {
 
 }
 
-# Main function
+# Main function.
+# Calls the service plugins for the configured lists, which in turn call the notification
+# function, and saves their output to the database if wanted.
 main() {
 
 	new_online_db='{}'
@@ -510,6 +545,7 @@ then
 	# Reset and exit.
 	interactive_cleanup
 
+# Non-interactive mode: Update the database.
 else
 
 	# Run the main program.
