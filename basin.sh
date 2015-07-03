@@ -5,14 +5,13 @@
 # BEGIN BOOTSTRAPPING
 
 # Check for flags.
-while getopts ":c:C:i" opt; do
+while getopts ":c:Ci" opt; do
 	case $opt in
 		c)
 			alt_config="$OPTARG"
 		;;
 		C)
 			create_config=true
-			create_config_file="$OPTARG"
 		;;
 		i)
 			interactive=true
@@ -32,13 +31,9 @@ TC_BASEDIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
 # BEGIN CONFIGFILE
 # Create a default config file if -C was called.
-if [ "$create_config" == true ]
+if [[ "$create_config" == "true" ]]
 then
-	if [[ -z "$create_config_file" ]]
-	then
-		create_config_file="$HOME/.config/basinrc"
-	fi
-	cat > $create_config_file <<"CONFIG"
+	cat > $HOME/.config/basinrc <<"CONFIG"
 #!/bin/bash
 # basin.sh - A bash script that collects all the streams you care about in one place. by BrowncoatShadow and Crendgrim
 
@@ -102,6 +97,8 @@ PB_ALLURI=false
 ###
 OSX_TERMNOTY=false
 CONFIG
+	$EDITOR $HOME/.config/basinrc
+	exit 0
 fi
 # END CONFIGFILE
 
@@ -112,7 +109,7 @@ then
 	CFGFILE=$alt_config
 else
 	# If the config file does not exist yet, create it from a default template.
-	[[ -f "$HOME/.config/basinrc" ]] || sed "s#<INSTALL_DIR>#$TC_BASEDIR#g" "$TC_BASEDIR/basinrc.default" > "$HOME/.config/basinrc"
+	[[ -f "$HOME/.config/basinrc" ]] || echo "You need a config file. Try the flag -C."; exit 1
 
 	# Use defalt config file.
 	CFGFILE=$HOME/.config/basinrc
