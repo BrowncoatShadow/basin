@@ -107,7 +107,11 @@ then
 	CFGFILE=$alt_config
 else
 	# If the config file does not exist yet, create it from a default template.
-	[[ -f "$HOME/.config/basinrc" ]] || echo "ERROR basinrc file is missing. Create one with the -C flag."; exit 1
+	if [[ ! -f "$HOME/.config/basinrc" ]]
+	then
+		echo "ERROR basinrc file is missing. Create one with the -C flag."
+		exit 1
+	fi
 
 	# Use defalt config file.
 	CFGFILE=$HOME/.config/basinrc
