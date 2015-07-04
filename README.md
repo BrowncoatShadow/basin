@@ -9,13 +9,13 @@ basin.sh
 
 
 ## Notification Modules
-- `echo_notify.sh`
+- `echo_notify`
   - Echos any active streams to terminal.
-- `kdialog_notify.sh`
+- `kdialog_notify`
   - Gives desktop notifications using kdialog in [KDE](https://www.kde.org/).
-- `osx_notify.sh`
+- `osx_notify`
   - Sends notifications to OS X's Notification Center. Does not allow for the channel's url to be opened when clicking the notification. There is a workaround using [terminal-notifier](https://github.com/alloy/terminal-notifier), which will open channel urls when clicked. There is a setting for which method to use in the basinrc file.
-- `pb_notify.sh`
+- `pb_notify`
   - Sends push notifications using [pushbullet](https://pushbullet.com). This can be used for both mobile notifications and desktop notifications when paired with the pushbullet browser extention or desktop app.
 
 
