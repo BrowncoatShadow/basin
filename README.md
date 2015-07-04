@@ -23,9 +23,9 @@ basin.sh
 ```
 git clone https://github.com/BrowncoatShadow/basin.sh.git basin
 cd basin
-./basin.sh
+./basin.sh -C
 ```
-This will generate `~/.config/basinrc`, which you will need to edit to set your settings. The bare minimal settings that you will need to define are listed in the "Configuration" section below.
+This will generate `~/.config/basinrc`, which will then open for you to edit.
 
 The script was designed to be run in crontab. You can quickly add it to your crontab by running the below command.
 ```
@@ -43,6 +43,8 @@ Again, this assumes a check every minute and script installation in your home fo
 ## Flags
 - `-c <rcfile>`
   - Use alt config file. This will cause the script not to check for, create, or use the default config. Instead it will use the config file given as an argument.
+_ `-C`
+  - Create a new config file. This generates `~/.config/basinrc` and then opens it in EDITOR for the user to give initial settings.
 - `-i`
   - Interactive, updating list that shows which streams are live. It uses the offline database, so the script needs to be periodically running in the background (for example, via cronjob) for updates to show.
 
