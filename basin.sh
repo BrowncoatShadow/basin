@@ -2,7 +2,7 @@
 # basin.sh - A bash script that collects all the streams you care about in one place. by BrowncoatShadow and Crendgrim
 
 
-# BEGIN BOOTSTRAPPING
+# BEGIN BOOTSTRAPPING {{{
 
 # Check for flags.
 while getopts ":c:Ci" opt; do
@@ -26,7 +26,7 @@ done
 # Add jq's install dir (via homebrew) to PATH for cron on OS X.
 PATH=$PATH:/usr/local/bin
 
-# BEGIN CONFIGFILE
+# BEGIN CONFIGFILE {{{
 # Create a default config file if -C was called.
 if [[ "$create_config" == "true" ]]
 then
@@ -107,7 +107,7 @@ CONFIG
 	$EDITOR $HOME/.config/basinrc
 	exit 0
 fi
-# END CONFIGFILE
+# END CONFIGFILE }}}
 
 # Check if alternative config file is defined.
 if [[ -n "$alt_config" ]]
@@ -157,12 +157,12 @@ check_file $DBFILE "{}"
 # Cleanup: If the database file is older than 2 hours, consider it outdated and remove its contents.
 [[ -s $DBFILE && $(($(date +%s)-$(cat $DBFILE | jq -r '.lastcheck // 0'))) -gt 7200 ]] && echo "{}" > $DBFILE
 
-# END BOOTSTRAPPING
+# END BOOTSTRAPPING }}}
 
 
-# BEGIN FUNCTIONS
+# BEGIN FUNCTIONS {{{
 
-# BEGIN NOTIFIERS
+# BEGIN NOTIFIERS {{{
 
 # These are the functions that are called whenever a stream changes its status to execute the
 # user-visible notification.
@@ -254,10 +254,10 @@ pb_notify() {
 	fi
 }
 
-# END NOTIFIERS
+# END NOTIFIERS }}}
 
 
-# BEGIN SERVICES
+# BEGIN SERVICES {{{
 
 # The plugins for the different streaming services. These functions are responsible for fetching
 # data from the foreign APIs, parsing this data and calling `check_notify` for any live streams.
@@ -350,7 +350,7 @@ get_channels_hitbox() {
 
 }
 
-# END SERVICES
+# END SERVICES }}}
 
 
 # Get data from the database.
@@ -452,10 +452,10 @@ main() {
 
 }
 
-# END FUNCTIONS
+# END FUNCTIONS }}}
 
 
-# BEGIN PROGRAM
+# BEGIN PROGRAM {{{
 
 # Check if we are supposed to be running in interactive mode.
 if [ "$interactive" == "true" ]
@@ -562,6 +562,6 @@ else
 
 fi
 
-# END PROGRAM
+# END PROGRAM }}}
 
 exit 0
