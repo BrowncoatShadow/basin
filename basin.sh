@@ -1,6 +1,6 @@
 #!/bin/bash
 # basin.sh - A bash script that collects all the streams you care about in one place. by BrowncoatShadow and Crendgrim
-
+# <https://github.com/BrowncoatShadow/basin.sh>
 
 # BEGIN BOOTSTRAPPING {{{
 
@@ -43,7 +43,8 @@ then
 
 	cat > $HOME/.config/basinrc <<"CONFIG"
 #!/bin/bash
-# basin.sh - A bash script that collects all the streams you care about in one place. by BrowncoatShadow and Crendgrim
+# basinrc - Configuration file for basin.sh. by BrowncoatShadow and Crendgrim
+# <https://github.com/BrowncoatShadow/basin.sh>
 
 ### GENERAL SETTINGS
 # DBFILE - The database file for storing currently online streams.
