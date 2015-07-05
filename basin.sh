@@ -23,8 +23,11 @@ while getopts ":c:Ci" opt; do
 	esac
 done
 
-# Add jq's install dir (via homebrew) to PATH for cron on OS X.
-PATH=$PATH:/usr/local/bin
+# Check if script is on OS X, then add jq's install dir (via homebrew) to PATH.
+if [[ "$(uname)" == "Darwin" ]]
+then
+        PATH=$PATH:/usr/local/bin
+fi
 
 # BEGIN CONFIGFILE {{{
 # Create a default config file if -C was called.
