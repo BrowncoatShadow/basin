@@ -43,7 +43,7 @@ Again, this assumes a check every minute and script installation in your home fo
 ## Flags
 - `-c <rcfile>`
   - Use alt config file. This will cause the script not to check for, create, or use the default config. Instead it will use the config file given as an argument.
-_ `-C`
+- `-C`
   - Create a new config file. This generates `~/.config/basinrc` and then opens it in EDITOR for the user to give initial settings.
 - `-i`
   - Interactive, updating list that shows which streams are live. It uses the offline database, so the script needs to be periodically running in the background (for example, via cronjob) for updates to show.
