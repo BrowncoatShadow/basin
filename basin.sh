@@ -494,13 +494,16 @@ then
 			main
 			last_checked=$(cat $DBFILE | jq -r '.lastcheck')
 		fi
+
+		# Print the header.
+		echo -n "Streams currently live: (last checked at "
 		# If we are on OS X, then use the correct `date` format.
 		if [[ "$ostype" == "Darwin" ]]
 		then
-			echo "Streams currently live: (last checked at $(date -jf %s "$last_checked" "+%H:%M"))"
+			echo "$(date -jf %s "$last_checked" "+%H:%M"))"
 		# Use the regular date format for everything else.
 		else
-			echo "Streams currently live: (last checked at $(date --date="@$last_checked" "+%H:%M"))"
+			echo "$(date --date="@$last_checked" "+%H:%M"))"
 		fi
 		echo "[press q to exit]"
 
