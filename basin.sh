@@ -23,8 +23,11 @@ while getopts ":c:Ci" opt; do
 	esac
 done
 
-# Check if script is on OS X, then add jq's install dir (via homebrew) to PATH.
-if [[ "$(uname)" == "Darwin" ]]
+# Check what type of os we are running on.
+ostype="$(uname)"
+
+# If script is on OS X, then add jq's install dir (via homebrew) to PATH.
+if [[ "$ostype" == "Darwin" ]]
 then
         PATH=$PATH:/usr/local/bin
 fi
@@ -189,7 +192,7 @@ kdialog_notify() {
 }
 
 # OS X notifier.
-osx_notifiy() {
+osx_notify() {
 	# Check which notification type to use.
 	if [ "$OSX_TERMNOTY" == "true" ]
 	then
@@ -491,7 +494,14 @@ then
 			main
 			last_checked=$(cat $DBFILE | jq -r '.lastcheck')
 		fi
-		echo "Streams currently live: (last checked at $(date --date="@$last_checked" "+%H:%M"))"
+		# If we are on OS X, then use the correct `date` format.
+		if [[ "$ostype" == "Darwin" ]]
+		then
+			echo "Streams currently live: (last checked at $(date -jf %s "$last_checked" "+%H:%M"))"
+		# Use the regular date format for everything else.
+		else
+			echo "Streams currently live: (last checked at $(date --date="@$last_checked" "+%H:%M"))"
+		fi
 		echo "[press q to exit]"
 
 		# Pretty-print the database json
