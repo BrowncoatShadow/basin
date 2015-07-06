@@ -49,6 +49,7 @@ then
 # basinrc - Configuration file for basin.sh. by BrowncoatShadow and Crendgrim
 # <https://github.com/BrowncoatShadow/basin.sh>
 
+
 ### GENERAL SETTINGS
 # DBFILE - The database file for storing currently online streams.
 #	default: DBFILE=$HOME/.local/share/basin/online.json
@@ -57,23 +58,24 @@ then
 #	default: DEBUGFILE=$HOME/.local/share/basin/debug.json
 # MODULE - The notification module to use.
 #	default: MODULE=echo_notify
-###
 DBFILE=$HOME/.local/share/basin/online.json
 DEBUGFILE=$HOME/.local/share/basin/debug.json
 MODULE=echo_notify
 
 
+### SERVICE SETTINGS
+# Settings for the various streaming services to check.
+
 ### TWITCH SETTINGS
 # TWITCH_USER - Your Twitch user in all lower-case letters. If set, use this user's followed channels.
 #	default: TWITCH_USER=
-# TWITCH_FOLLOWLIST - Additional list of streams to check on, divided by spaces. Useful for watching yourself.
+# TWITCH_FOLLOWLIST - Additional list of streams to check on, divided by spaces.
 #	default: TWITCH_FOLLOWLIST=""
 # TWITCH_CLIENT_ID - Twitch client_id, generate at <http://www.twitch.tv/kraken/oauth2/clients/new>.
 #	default: TWITCH_CLIENT_ID=
 TWITCH_USER=
 TWITCH_FOLLOWLIST=""
 TWITCH_CLIENT_ID=
-
 
 ### HITBOX SETTINGS
 # HITBOX_USER - Your Hitbox user in all lower-case letters. If set, use this user's followed channels.
@@ -84,6 +86,8 @@ HITBOX_USER=
 HITBOX_FOLLOWLIST=""
 
 
+### NOTIFIER SETTINGS
+# Settings for the user-visable notifications for changes to a stream status.
 ### PUSHBULLET SETTINGS
 # Note: If PB_URLTARGET and PB_URITARGET are unset, the module will send to all targets.
 #
@@ -95,17 +99,14 @@ HITBOX_FOLLOWLIST=""
 #	default: PB_URLTARGET=""
 # PB_ALLURI - Change to 'true' to use application URI instead of URL when sending to all targets.
 #	default: PB_URI=false
-###
 PB_TOKEN=
 PB_URLTARGET=""
 PB_URITARGET=""
 PB_ALLURI=false
 
-
 ### OS X SETTINGS
 # OSX_TERMNOTY - Set to 'true' to use terminal-notifier app instead of applescript. This enables clicking the notification to launch URL.
 #	default: OSX_TERMNOTY=false
-###
 OSX_TERMNOTY=false
 CONFIG
 	$EDITOR $HOME/.config/basinrc
