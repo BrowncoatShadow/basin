@@ -38,6 +38,17 @@ if [[ "$create_config" == "true" ]]
 then
 	# Setup function for generating basinrc.
 	generate_config() {
+	# If the file exists already, ask the user if he really wants to replace it.
+	if [[ -f "$HOME/.config/basinrc" ]]
+	then
+		read -p "The configuration file \`$HOME/.config/basinrc\` exists already. Are you sure you want to replace it? [y/N] " prompt_config
+		if [[ $prompt_config != "y" && $prompt_config != "Y" && $prompt_config != "yes" && $prompt_config != "YES" ]]
+		then
+			return 0
+		fi
+	fi
+
+		# Generate default basinrc.
 		cat > $HOME/.config/basinrc <<"CONFIG"
 #!/bin/bash
 # basinrc - Configuration file for basin.sh. by BrowncoatShadow and Crendgrim
@@ -82,6 +93,7 @@ HITBOX_FOLLOWLIST=""
 
 ### NOTIFIER SETTINGS
 # Settings for the user-visable notifications for changes to a stream status.
+
 ### PUSHBULLET SETTINGS
 # Note: If PB_URLTARGET and PB_URITARGET are unset, the module will send to all targets.
 #
@@ -103,6 +115,7 @@ PB_ALLURI=false
 #	default: OSX_TERMNOTY=false
 OSX_TERMNOTY=false
 CONFIG
+		# Open the new basinrc with the users EDITOR, so they can configure it.
 		$EDITOR $HOME/.config/basinrc
 	}
 
@@ -112,23 +125,12 @@ CONFIG
 		if [[ $prompt_cron != "y" && $prompt_cron != "Y" && $prompt_cron != "yes" && $prompt_cron != "YES" ]]
 		then
 			return
-		else
-			source_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-			crontab -l | { cat; echo "*/1 * * * * $source_dir/basin.sh"; } | crontab - &>/dev/null
 		fi
+		source_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+		crontab -l | { cat; echo "*/1 * * * * $source_dir/basin.sh"; } | crontab - 
 	}
 
-	# If the file exists already, ask the user if he really wants to replace it.
-	if [[ -f "$HOME/.config/basinrc" ]]
-	then
-		read -p "The configuration file \`$HOME/.config/basinrc\` exists already. Are you sure you want to replace it? [y/N] " prompt_config
-		if [[ $prompt_config != "y" && $prompt_config != "Y" && $prompt_config != "yes" && $prompt_config != "YES" ]]
-		then
-			setup_cron
-			exit 0
-		fi
-	fi
-	
+	# Generate the config and setup the cronjob, exit after.
 	generate_config
 	setup_cron
 	exit 0
