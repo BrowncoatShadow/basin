@@ -121,6 +121,12 @@ CONFIG
 
 	# Setup function for creating cronjob.
 	setup_cron() {
+		# Check if our cronjob exists already. Skip this step if it does.
+		croncheck=$(crontab -l 2> /dev/null | grep -q 'basin.sh'  && echo 'exists')
+		if [[ "$croncheck" == "exists" ]]
+		then
+			return
+		fi
 		read -p "Would you like basin.sh to add itself to your crontab? (This runs the script every minute.) [y/N] " prompt_cron
 		if [[ $prompt_cron != "y" && $prompt_cron != "Y" && $prompt_cron != "yes" && $prompt_cron != "YES" ]]
 		then
