@@ -34,7 +34,7 @@ cd basin
 This will generate `~/.config/basinrc`, which will then open for you to edit.  
 It will then ask if you want it to setup a cronjob in your crontab. This cronjob will run every minute by default. You can change the frequency by editing your crontab.
 
-Alternitively, you can manually add the script to your crontab by running `crontab -e` and adding the below line.  
+Alternatively, you can manually add the script to your crontab by running `crontab -e` and adding the below line.  
 ```
 */1 * * * * ~/basin/basin.sh
 ```
