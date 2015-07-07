@@ -36,18 +36,9 @@ fi
 # Create a default config file if -C was called.
 if [[ "$create_config" == "true" ]]
 then
-	# If the file exists already, ask the user if he really wants to replace it.
-	if [[ -f "$HOME/.config/basinrc" ]]
-	then
-		read -p "The configuration file \`$HOME/.config/basinrc\` exists already. Are you sure you want to replace it? [y/N] " prompt
-		if [[ $prompt != "y" && $prompt != "Y" && $prompt != "yes" && $prompt != "YES" ]]
-		then
-			echo "Aborting."
-			exit 0
-		fi
-	fi
-
-	cat > $HOME/.config/basinrc <<"CONFIG"
+	# Setup function for generating basinrc.
+	generate_config() {
+		cat > $HOME/.config/basinrc <<"CONFIG"
 #!/bin/bash
 # basinrc - Configuration file for basin.sh. by BrowncoatShadow and Crendgrim
 # <https://github.com/BrowncoatShadow/basin.sh>
@@ -112,7 +103,34 @@ PB_ALLURI=false
 #	default: OSX_TERMNOTY=false
 OSX_TERMNOTY=false
 CONFIG
-	$EDITOR $HOME/.config/basinrc
+		$EDITOR $HOME/.config/basinrc
+	}
+
+	# Setup function for creating cronjob.
+	setup_cron() {
+		read -p "Would you like basin.sh to add itself to your crontab? (This runs the script every minute.) [y/N] " prompt_cron
+		if [[ $prompt_cron != "y" && $prompt_cron != "Y" && $prompt_cron != "yes" && $prompt_cron != "YES" ]]
+		then
+			return
+		else
+			source_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+			crontab -l | { cat; echo "*/1 * * * * $source_dir/basin.sh"; } | crontab - &>/dev/null
+		fi
+	}
+
+	# If the file exists already, ask the user if he really wants to replace it.
+	if [[ -f "$HOME/.config/basinrc" ]]
+	then
+		read -p "The configuration file \`$HOME/.config/basinrc\` exists already. Are you sure you want to replace it? [y/N] " prompt_config
+		if [[ $prompt_config != "y" && $prompt_config != "Y" && $prompt_config != "yes" && $prompt_config != "YES" ]]
+		then
+			setup_cron
+			exit 0
+		fi
+	fi
+	
+	generate_config
+	setup_cron
 	exit 0
 fi
 # END CONFIGFILE }}}

@@ -5,7 +5,7 @@ basin.sh
 
 ## Services
 - [twitch.tv](http://twitch.tv)
-- [hitbox](http://hitbox.tv)
+- [hitbox.tv](http://hitbox.tv)
 
 
 ## Notification Modules
@@ -19,25 +19,26 @@ basin.sh
   - Sends push notifications using [pushbullet](https://pushbullet.com). This can be used for both mobile notifications and desktop notifications when paired with the pushbullet browser extention or desktop app.
 
 
+## Dependencies
+- [jq](http://stedolan.github.io/jq/)
+- [curl](http://curl.haxx.se/)
+- Optional: [terminal-notifier](https://github.com/alloy/terminal-notifier) (OS X)
+
+
 ## Installation
 ```
 git clone https://github.com/BrowncoatShadow/basin.sh.git basin
 cd basin
 ./basin.sh -C
 ```
-This will generate `~/.config/basinrc`, which will then open for you to edit.
-
-The script was designed to be run in crontab. You can quickly add it to your crontab by running the below command.
-```
-crontab -l | { cat; echo "*/1 * * * * ~/basin/basin.sh"; } | crontab -
-```
-The above command assumes you installed the script in your home folder and runs it every minute. You can tweak the cronjob to use a custom location for the script and/or the interval for running the script.
+This will generate `~/.config/basinrc`, which will then open for you to edit.  
+It will then ask if you want it to setup a cronjob in your crontab. This cronjob will run every minute by default. You can change the frequency by editing your crontab.
 
 Alternitively, you can manually add the script to your crontab by running `crontab -e` and adding the below line.  
 ```
 */1 * * * * ~/basin/basin.sh
 ```
-Again, this assumes a check every minute and script installation in your home folder. 
+This assumes a check every minute and script installation in your home folder.
 
 
 ## Flags
@@ -47,12 +48,6 @@ Again, this assumes a check every minute and script installation in your home fo
   - Create a new config file. This generates `~/.config/basinrc` and then opens it in EDITOR for the user to give initial settings.
 - `-i`
   - Interactive, updating list that shows which streams are live. It uses the offline database, so the script needs to be periodically running in the background (for example, via cronjob) for updates to show.
-
-
-## Dependencies
-- [jq](http://stedolan.github.io/jq/)
-- [curl](http://curl.haxx.se/)
-- Optional: [terminal-notifier](https://github.com/alloy/terminal-notifier) (OS X)
 
 
 ## Contributing
