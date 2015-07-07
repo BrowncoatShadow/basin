@@ -127,7 +127,7 @@ CONFIG
 			return
 		fi
 		source_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-		crontab -l | { cat; echo "*/1 * * * * $source_dir/basin.sh"; } | crontab - 
+		crontab -l 2> /dev/null | { cat; echo "*/1 * * * * $source_dir/basin.sh"; } | crontab - 
 	}
 
 	# Generate the config and setup the cronjob, exit after.
