@@ -4,6 +4,32 @@
 
 # BEGIN BOOTSTRAPPING {{{
 
+# Create function for throwing errors.
+throw_error() {
+	red='\033[0;31m'
+	echo -e "$red[ERROR] $1" >&2
+}
+
+# Create function for checking dependencies.
+depends_on() {
+	command -v $1 > /dev/null
+	if [[ "$?" == "1" ]]
+	then
+		throw_error "Missing dependency: $1"
+		missing_depend=true
+	fi
+}
+ 
+# Check for dependencies.
+depends_on jq
+depends_on curl
+
+# Exit if a dependency is missing.
+if [[ "$missing_depend" == "true" ]]
+then
+	exit 1
+fi
+
 # Check for flags.
 while getopts ":c:Ci" opt; do
 	case $opt in
@@ -17,7 +43,7 @@ while getopts ":c:Ci" opt; do
 			interactive=true
 		;;
 		\?)
-			echo "[ERROR] Invalid option: -$OPTARG" >&2
+			throw_error "Invalid option: -$OPTARG"
 			exit 1
 		;;
 	esac
@@ -141,7 +167,7 @@ CONFIG
 	setup_cron
 	exit 0
 fi
-# END CONFIGFILE }}}
+ # END CONFIGFILE }}}
 
 # Check if alternative config file is defined.
 if [[ -n "$alt_config" ]]
@@ -149,9 +175,9 @@ then
 	# If the config file does not exist yet, exit with a descriptive error message.
 	if [[ ! -f "$alt_config" ]]
 	then
-		echo "[ERROR] The specified configuration file $alt_config is missing." >&2
-		echo "[ERROR] You can create it by copying the default configuration file at \`$HOME/.config/basinrc\`." >&2
-		echo "[ERROR] If that file does not exist, you can create it by calling \`basin.sh -C\`." >&2
+		throw_error "The specified configuration file $alt_config is missing."
+		throw_error "You can create it by copying the default configuration file at \`$HOME/.config/basinrc\`."
+		throw_error "If that file does not exist, you can create it by calling \`basin.sh -C\`."
 		exit 1
 	fi
 
@@ -161,8 +187,8 @@ else
 	# If the config file does not exist yet, exit with a descriptive error message.
 	if [[ ! -f "$HOME/.config/basinrc" ]]
 	then
-		echo "[ERROR] The default configuration file $HOME/.config/basinrc is missing." >&2
-		echo "[ERROR] You can create it by calling \`basin.sh -C\`." >&2
+		throw_error "The default configuration file $HOME/.config/basinrc is missing."
+		throw_error "You can create it by calling \`basin.sh -C\`."
 		exit 1
 	fi
 
@@ -238,7 +264,7 @@ pb_notify() {
 	# Make sure we have a token.
 	if [[ -z "$PB_TOKEN" ]]
 	then
-		echo "[ERROR] You need to set PB_TOKEN in your settings file." >&2
+		throw_error "You need to set PB_TOKEN in your settings file."
 		exit 1
 	fi
 	
