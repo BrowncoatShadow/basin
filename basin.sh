@@ -4,6 +4,15 @@
 
 # BEGIN BOOTSTRAPPING {{{
 
+# Check what type of os we are running on.
+ostype="$(uname)"
+
+# If script is on OS X, then add jq's install dir (via homebrew) to PATH.
+if [[ "$ostype" == "Darwin" ]]
+then
+        PATH=$PATH:/usr/local/bin
+fi
+
 # Create function for throwing errors.
 throw_error() {
 	red='\033[0;31m'
@@ -48,15 +57,6 @@ while getopts ":c:Ci" opt; do
 		;;
 	esac
 done
-
-# Check what type of os we are running on.
-ostype="$(uname)"
-
-# If script is on OS X, then add jq's install dir (via homebrew) to PATH.
-if [[ "$ostype" == "Darwin" ]]
-then
-        PATH=$PATH:/usr/local/bin
-fi
 
 # BEGIN CONFIGFILE {{{
 # Create a default config file if -C was called.
