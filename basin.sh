@@ -16,7 +16,8 @@ fi
 # Create function for throwing errors.
 throw_error() {
 	red='\033[0;31m'
-	echo -e "$red[ERROR] $1" >&2
+	nc='\033[0m'
+	echo -e "$red[ERROR] $1$nc" >&2
 }
 
 # Create function for checking dependencies.
