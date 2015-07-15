@@ -251,12 +251,12 @@ osx_notify() {
 	then
 
 		# Send using terminal-notifier
-		terminal-notifier -message "$3" -title "basin.sh" -subtitle "$1 is now streaming $2" -open "$4"
+		terminal-notifier -message "$3" -title "$5" -subtitle "$1 is now streaming $2" -open "$4"
 
 	else
 
 		# Send using OS X applescript (no URL support)
-		osascript -e "display notification \"$3\" with title \"basin.sh\" subtitle \"$1 is now streaming $2\""
+		osascript -e "display notification \"$3\" with title \"$5\" subtitle \"$1 is now streaming $2\""
 	fi
 }
 
