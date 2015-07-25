@@ -500,12 +500,16 @@ main() {
 	# Check if we have a user set or any channels to follow.
 	if [[ -n "$TWITCH_USER" || -n "$TWITCH_FOLLOWLIST" ]]
 	then
-		new_online_db="$(get_channels_twitch | jq "$new_online_db + {twitch: .}")"
+		module_json="$(get_channels_twitch)"
+		[ -z "$module_json" ] && module_json="[]"
+		new_online_db="$(echo "$module_json" | jq "$new_online_db + {twitch: .}")"
 	fi
 
 	if [[ -n "$HITBOX_USER" || -n "$HITBOX_FOLLOWLIST" ]]
 	then
-		new_online_db="$(get_channels_hitbox | jq "$new_online_db + {hitbox: .}")"
+		module_json="$(get_channels_hitbox)"
+		[ -z "$module_json" ] && module_json="[]"
+		new_online_db="$(echo "$module_json" | jq "$new_online_db + {hitbox: .}")"
 	fi
 
 	# Save online database
