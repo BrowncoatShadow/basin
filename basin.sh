@@ -117,6 +117,10 @@ TWITCH_CLIENT_ID=
 HITBOX_USER=
 HITBOX_FOLLOWLIST=""
 
+### AZUBU SETTINGS
+# AZUBU_FOLLOWLIST - List of streams to check on, divided by spaces.
+# default: AZUBU_FOLLOWLIST=""
+AZUBU_FOLLOWLIST=""
 
 ### NOTIFIER SETTINGS
 # Settings for the user-visable notifications for changes to a stream status.
@@ -411,6 +415,30 @@ get_channels_hitbox() {
 
 }
 
+# Azubu service plugin
+get_channels_azubu() {
+
+	# Remove duplicates from the list.
+	azubu_list=$(echo $(printf '%s\n' $AZUBU_FOLLOWLIST | sort -u))
+
+	# Sanitize the list for the fetch url.
+	urllist=$(echo $azubu_list | sed 's/ /\,/g')
+
+	# Fetch the JSON for all followed channels.
+	returned_data="$(curl -s -X GET "http://api.azubu.tv/public/channel/list?channels=$urllist")"
+
+	# Create new database.
+	new_online_json="$(echo "$returned_data" | jq '[.data [] | select(.is_live == true) | {name: .user.username, display_name: .user.display_name, game: .category.title, status: .title, url: .url_channel}]')"
+
+	# Notify for new streams.
+	for channel in $azubu_list
+	do
+		check_notify 'azubu' "$new_online_json" ${channel}
+	done
+	echo "$new_online_json"
+
+}
+
 # END SERVICES }}}
 
 
@@ -512,6 +540,13 @@ main() {
 		new_online_db="$(echo "$module_json" | jq "$new_online_db + {hitbox: .}")"
 	fi
 
+	if [[ -n "$AZUBU_FOLLOWLIST" ]]
+	then
+		module_json="$(get_channels_azubu)"
+		[ -z "$module_json" ] && module_json="[]"
+		new_online_db="$(echo "$module_json" | jq "$new_online_db + {azubu: .}")"
+	fi
+
 	# Save online database
 	[[ -n "$DBFILE" ]] && echo "$new_online_db" | jq '. + {lastcheck:'$(date +%s)'}' > $DBFILE
 
@@ -566,7 +601,7 @@ then
 
 		# Pretty-print the database json
 		echo -e "$(cat $DBFILE | jq -r '
-			(.twitch + .hitbox)[] |
+			(.twitch + .hitbox + .azubu)[] |
 			[
 				"\n\\033[1;34m", .display_name, "\\033[0m",
 				(

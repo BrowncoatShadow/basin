@@ -6,6 +6,7 @@ basin.sh
 ## Services
 - [twitch.tv](http://twitch.tv)
 - [hitbox.tv](http://hitbox.tv)
+- [azubu.tv](http://azubu.tv)
 
 
 ## Notification Modules
