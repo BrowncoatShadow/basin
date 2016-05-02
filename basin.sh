@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # basin.sh - A bash script that collects all the streams you care about in one place. by BrowncoatShadow and Crendgrim
 # <https://github.com/BrowncoatShadow/basin.sh>
 
