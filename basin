@@ -12,7 +12,7 @@ check_system() { # platform specific fixes and function definitions
     PATH=${PATH}:/usr/local/bin
     # helper for interactive mode, returns the given time using system's `date`
     system_date() { echo "$(date -jf %s "${1}" "+%H:%M"))"; }
-  elif [[ "${system_type}" == "Linux" ]] # Linux
+  elif [[ "${system_type}" == "Linux" ]]; then # Linux
     system_date() { echo "$(date --date="@${1}" "+%H:%M"))"; }
   else # unknown system
     error "${system_type} is not supported."
@@ -31,8 +31,7 @@ depends_on() { # check for a given dependency, exit if missing
     exit 1
   fi
 }
-load_config() { # load configuration from file
-  # check if alternative config file is defined
+load_config() { # load configuration from file # check if alternative config file is defined
   if [[ -n "${ALT_CONFIG}" ]]; then
     # if the config file does not exist yet, exit with a descriptive error message
     if [[ ! -f "${ALT_CONFIG}" ]]; then
@@ -445,7 +444,7 @@ service_hitbox() { # http://www.hitbox.tv/
   local hitbox_list="${HITBOX_FOLLOWLIST}"
   # if user is set, fetch user's follow list and add them to the list
   if [[ -n ${HITBOX_USER} ]]; then
-    && hitbox_list="${hitbox_list} \
+    hitbox_list="${hitbox_list} \
     "$(curl -s \
     -X GET "https://api.hitbox.tv/following/user/?user_name=${HITBOX_USER}" \
     | jq -r '.following[] | .user_name' \
