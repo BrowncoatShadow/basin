@@ -71,7 +71,8 @@ init_config() { # generate a default configuration file
   # Generate default basinrc.
   cat > ${HOME}/.config/basinrc <<"CONFIG"
 #!/bin/bash
-# basinrc - Configuration file for basin. by BrowncoatShadow and Crendgrim
+# basinrc - Configuration file for basin.
+# by BrowncoatShadow and Crendgrim
 # <https://github.com/BrowncoatShadow/basin>
 
 
@@ -81,11 +82,11 @@ init_config() { # generate a default configuration file
 # DEBUGFILE - The file for storing debug data. This can help to debug the script itself.
 #	NOTE: This functionality is currently broken.
 #	default: DEBUGFILE=${HOME}/.local/share/basin/debug.json
-# MODULE - The notification module to use.
-#	default: MODULE=notifier_echo
+# NOTIFIER - The notification plugin to use.
+#	default: MODULE=echo
 DBFILE=${HOME}/.local/share/basin/online.json
 DEBUGFILE=${HOME}/.local/share/basin/debug.json
-MODULE=notifier_echo
+NOTIFIER=echo
 
 
 ### SERVICE SETTINGS
@@ -250,7 +251,8 @@ notifier_gateway() { # determine if a channel merits notification, call notifier
     fi
     if [[ ${notify} == true ]]; then
       # send notification by using the module and giving it the arguments
-      ${MODULE} "${sdisplay_name}" "${sgame}" "${sstatus}" "${slink}" "${service}"
+      local notifier="notifier_${NOTIFIER}"
+      ${notifier} "${sdisplay_name}" "${sgame}" "${sstatus}" "${slink}" "${service}"
     fi
   fi
 }
