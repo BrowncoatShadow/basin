@@ -253,7 +253,7 @@ notifier_gateway() { # determine if a channel merits notification, call notifier
     fi
     if [[ ${notify} == true ]]; then
       # send notification by using the module and giving it the arguments
-      local notifier="notifier_${NOTIFIER}"
+      local notifier="notifier::${NOTIFIER}"
       ${notifier} "${sdisplay_name}" "${sgame}" "${sstatus}" "${slink}" "${service}"
     fi
   fi
@@ -262,9 +262,9 @@ services_gateway() { # call each service plugin, collect their data for database
   # initialize global that will be updated by each service function
   new_online_db='{}'
   # call the plugin for each service
-  service_twitch
-  service_hitbox
-  service_azubu
+  service::twitch
+  service::hitbox
+  service::azubu
   # send the updated data to the database
   db_update "${new_online_db}"
 }
@@ -278,16 +278,16 @@ services_gateway() { # call each service plugin, collect their data for database
 #   ${3}: The channel's status text, a descriptive caption set by the broadcaster.
 #   ${4}: The link to the channel, correctly formatted for the service.
 #   ${5}: The service the livestream is on.
-notifier_echo() { # notify by printing to STDOUT in the terminal
+notifier::echo() { # notify by printing to STDOUT in the terminal
   echo "${5} | ${1} [${2}]: ${3} <${4}>"
 }
-notifier_kdialog() { # notify by KDialog popup
+notifier::kdialog() { # notify by KDialog popup
   kdialog \
     --title "${1} is now live on ${5}" \
     --icon "video-player" \
     --passivepopup "<b>${2}</b><br>${3}"
 }
-notifier_osx() { # notify with OS X native notifications
+notifier::osx() { # notify with OS X native notifications
   # check which notification type to use
   if [[ "${OSX_TERMNOTY}" == "true" ]]; then
     # send using terminal-notifier
@@ -304,7 +304,7 @@ notifier_osx() { # notify with OS X native notifications
       subtitle \"${1} is now streaming ${2}\""
   fi
 }
-notifier_pushbullet() { # notify by PushBullet API notification
+notifier::pushbullet() { # notify by PushBullet API notification
   # make sure we have a token
   if [[ -z "${PB_TOKEN}" ]]; then
     error "You need to set PB_TOKEN in your settings file."
@@ -377,7 +377,7 @@ notifier_pushbullet() { # notify by PushBullet API notification
 # Ideally, all service specific logic (config value checks, service related
 # naming, etc) should be contained within the service function. That way, adding
 # a new service plugin only consists of adding a function call to services_gateway().
-service_twitch() { # https://www.twitch.tv/
+service::twitch() { # https://www.twitch.tv/
   if [[ -z "${TWITCH_USER}" && -z "${TWITCH_FOLLOWLIST}" ]]; then
     return 0 # nothing to check
   fi
@@ -444,7 +444,7 @@ service_twitch() { # https://www.twitch.tv/
   # update the gloabl with entry for this service
   new_online_db="$(echo "${new_online_json}" | jq "${new_online_db} + {twitch: .}")"
 }
-service_hitbox() { # http://www.hitbox.tv/
+service::hitbox() { # http://www.hitbox.tv/
   if [[ -z "${HITBOX_USER}" && -z "${HITBOX_FOLLOWLIST}" ]]; then
     return 0 # nothing to check
   fi
@@ -525,7 +525,7 @@ service_hitbox() { # http://www.hitbox.tv/
   # update the gloabl with entry for this service
   new_online_db="$(echo "${new_online_json}" | jq "${new_online_db} + {hitbox: .}")"
 }
-service_azubu() { # http://www.azubu.tv/
+service::azubu() { # http://www.azubu.tv/
   if [[ -z "${AZUBU_FOLLOWLIST}" ]]; then
     return 0 # nothing to check
   fi
