@@ -1,6 +1,6 @@
-basin.sh
+basin
 =========
-**basin.sh** is a bash script that collects all the streams you care about in one place. It supports multiple services and notification methods, with more being added. basin.sh can be used for a single service, or multiple.
+**basin** is a bash script that collects all the streams you care about in one place. It supports multiple services and notification methods, with more being added. basin can be used for a single service, or multiple.
 
 
 ## Services
@@ -28,16 +28,16 @@ basin.sh
 
 ## Installation
 ```
-git clone https://github.com/BrowncoatShadow/basin.sh.git basin
+git clone https://github.com/BrowncoatShadow/basin.git
 cd basin
-./basin.sh -C
+./basin -C
 ```
-This will generate `~/.config/basinrc`, which will then open for you to edit.  
+This will generate `~/.config/basinrc`, which will then open for you to edit.
 It will then ask if you want it to setup a cronjob in your crontab. This cronjob will run every minute by default. You can change the frequency by editing your crontab.
 
-Alternatively, you can manually add the script to your crontab by running `crontab -e` and adding the below line.  
+Alternatively, you can manually add the script to your crontab by running `crontab -e` and adding the below line.
 ```
-*/1 * * * * ~/basin/basin.sh
+*/1 * * * * ~/basin/basin
 ```
 This assumes a check every minute and script installation in your home folder.
 
@@ -56,5 +56,5 @@ Want to add support for another service or notification method? Did you find a b
 
 
 ## License
-The MIT License (MIT)  
+The MIT License (MIT)
 Copyright (c) 2015

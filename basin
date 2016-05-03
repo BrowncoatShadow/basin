@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# basin.sh - collect all the streams you care about in one place
+# basin - collect all the streams you care about in one place
 # by BrowncoatShadow and Crendgrim
-# <https://github.com/BrowncoatShadow/basin.sh>
+# <https://github.com/BrowncoatShadow/basin>
 
 # TODO Re-implement debug functionality
 # TODO Re-implement command line arguments for passing custom lists
@@ -47,8 +47,8 @@ generate_config() { # setup function for generating basinrc
   # Generate default basinrc.
   cat > ${HOME}/.config/basinrc <<"CONFIG"
 #!/bin/bash
-# basinrc - Configuration file for basin.sh. by BrowncoatShadow and Crendgrim
-# <https://github.com/BrowncoatShadow/basin.sh>
+# basinrc - Configuration file for basin. by BrowncoatShadow and Crendgrim
+# <https://github.com/BrowncoatShadow/basin>
 
 
 ### GENERAL SETTINGS
@@ -123,12 +123,12 @@ setup_cron() { # setup function for creating cronjob
   # check if our cronjob exists already skip this step if it does
   # TODO this can be much cleaner
   local croncheck
-  croncheck=$(crontab -l 2> /dev/null | grep -q 'basin.sh'  && echo 'exists')
+  croncheck=$(crontab -l 2> /dev/null | grep -q 'basin'  && echo 'exists')
   if [[ "${croncheck}" == "exists" ]]; then
     return
   fi
 
-  local prompt_string="Would you like basin.sh to add itself to your crontab? (This runs the script every minute.) [y/N] "
+  local prompt_string="Would you like basin to add itself to your crontab? (This runs the script every minute.) [y/N] "
   read -p "${prompt_string}"
   # TODO replace this with extended regular expression
   if [[ ${REPLY} != "y" && ${REPLY} != "Y" && ${REPLY} != "yes" && ${REPLY} != "YES" ]]; then
@@ -142,7 +142,7 @@ setup_cron() { # setup function for creating cronjob
   # `parse error: Invalid numeric literal at line 1, column 20`
   # list crontab, concat that output with basin's cron job, feed back to crontab
   crontab -l 2> /dev/null \
-    | { cat; echo "*/1 * * * * ${source_dir}/basin.sh"; } \
+    | { cat; echo "*/1 * * * * ${source_dir}/basin"; } \
     | crontab -
 }
 load_config() { # load configuration from file
@@ -152,7 +152,7 @@ load_config() { # load configuration from file
     if [[ ! -f "${ALT_CONFIG}" ]]; then
       error "The specified configuration file ${ALT_CONFIG} is missing."
       error "You can create it by copying the default configuration file at \`${HOME}/.config/basinrc\`."
-      error "If that file does not exist, you can create it by calling \`basin.sh -C\`."
+      error "If that file does not exist, you can create it by calling \`basin -C\`."
       exit 1
     fi
 
@@ -162,7 +162,7 @@ load_config() { # load configuration from file
     # if the config file does not exist yet, exit with a descriptive error message
     if [[ ! -f "${HOME}/.config/basinrc" ]]; then
       error "The default configuration file ${HOME}/.config/basinrc is missing."
-      error "You can create it by calling \`basin.sh -C\`."
+      error "You can create it by calling \`basin -C\`."
       exit 1
     fi
 
