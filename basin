@@ -42,7 +42,7 @@ load_config() { # load configuration from file # check if alternative config fil
     fi
 
     # use alt config file if defined
-    CFGFILE=${ALT_CONFIG}
+    CFGFILE="${ALT_CONFIG}"
   else
     # if the config file does not exist yet, exit with a descriptive error message
     if [[ ! -f "${HOME}/.config/basinrc" ]]; then
@@ -52,11 +52,11 @@ load_config() { # load configuration from file # check if alternative config fil
     fi
 
     # use default config file
-    CFGFILE=${HOME}/.config/basinrc
+    CFGFILE="${HOME}/.config/basinrc"
   fi
 
   # load config file
-  source ${CFGFILE}
+  source "${CFGFILE}"
 }
 init_config() { # generate a default configuration file
   # if the file exists already, ask the user if he really wants to replace it
@@ -64,12 +64,12 @@ init_config() { # generate a default configuration file
     local prompt_string="The configuration file \`${HOME}/.config/basinrc\` exists already. Are you sure you want to replace it? [y/N] "
     read -p "${prompt_string}"
     # TODO replace this with extended regular expression
-    if [[ ${REPLY} != "y" && ${REPLY} != "Y" && ${REPLY} != "yes" && ${REPLY} != "YES" ]]; then
+    if [[ "${REPLY}" != "y" && "${REPLY}" != "Y" && "${REPLY}" != "yes" && "${REPLY}" != "YES" ]]; then
       return 0
     fi
   fi
   # Generate default basinrc.
-  cat > ${HOME}/.config/basinrc <<"CONFIG"
+  cat > "${HOME}/.config/basinrc" <<"CONFIG"
 #!/bin/bash
 # basinrc - Configuration file for basin.
 # by BrowncoatShadow and Crendgrim
@@ -142,13 +142,13 @@ OSX_TERMNOTY=false
 CONFIG
   # TODO Is this best practice?
   # open the new basinrc with the users ${EDITOR}, so they can configure it
-  ${EDITOR} ${HOME}/.config/basinrc
+  ${EDITOR} "${HOME}/.config/basinrc"
 }
 init_cron() { # create cronjob
   # check if job already exists in crontab, skip this step if it does
   # TODO this can be much cleaner
   local croncheck
-  croncheck=$(crontab -l 2> /dev/null | grep -q 'basin'  && echo 'exists')
+  croncheck="$(crontab -l 2> /dev/null | grep -q 'basin' && echo 'exists')"
   if [[ "${croncheck}" == "exists" ]]; then
     return
   fi
@@ -156,7 +156,7 @@ init_cron() { # create cronjob
   local prompt_string="Would you like basin to add itself to your crontab? (This runs the script every minute.) [y/N] "
   read -p "${prompt_string}"
   # TODO replace this with extended regular expression
-  if [[ ${REPLY} != "y" && ${REPLY} != "Y" && ${REPLY} != "yes" && ${REPLY} != "YES" ]]; then
+  if [[ "${REPLY}" != "y" && "${REPLY}" != "Y" && "${REPLY}" != "yes" && "${REPLY}" != "YES" ]]; then
     return
   fi
 
@@ -183,7 +183,7 @@ json_get() { # get data from json object
   echo "${1}" | jq -r '.[] | select(.name=="'${2}'") | .'${3}
 }
 db_get() { # get data from the database
-  cat ${DBFILE} | jq -r '(.'${1}' // [])[] | select(.name=="'${2}'") | .'${3}
+  cat "${DBFILE}" | jq -r '(.'${1}' // [])[] | select(.name=="'${2}'") | .'${3}
 }
 db_update() { # save given json object to the DBFILE
   if [[ -n "${DBFILE}" ]]; then
@@ -198,11 +198,11 @@ notifier_gateway() { # determine if a channel merits notification, call notifier
 
   # check if stream is active
   local name
-  name=$(json_get "${new_online_json}" "${channel}" 'name')
+  name="$(json_get "${new_online_json}" "${channel}" 'name')"
   if [[ "${name}" == "${channel}" ]]; then
     # check if it has been active since last check
     if [[ -n "${DBFILE}" ]]; then
-      dbcheck=$(db_get ${service} ${name} 'name')
+      dbcheck="$(db_get ${service} ${name} 'name')"
     fi
 
     local notify=true
@@ -228,11 +228,13 @@ notifier_gateway() { # determine if a channel merits notification, call notifier
         # This output can be used by the service plugins to replace the broken
         # record, so it does not show up in the database.
         echo null | jq '
-          {"name":"'${name}'",
-          "display_name":"'${sdisplay_name}'",
-          "game":"'"${sgame}"'",
-          "status":'"$(echo "${sstatus}" | jq -R '.')"',
-          "url": "'"${slink}"'"}'
+          {
+            "name": "'"${name}"'",
+            "display_name": "'"${sdisplay_name}"'",
+            "game": "'"${sgame}"'",
+            "status": '"$(echo "${sstatus}" | jq -R '.')"',
+            "url": "'"${slink}"'"
+          }'
       fi
       # otherwise ignore the broken result to not get a null/null notification
       return -1
@@ -380,7 +382,7 @@ service_twitch() { # https://www.twitch.tv/
     return 0 # nothing to check
   fi
   # use the specified followlist, if set
-  local twitch_list="${TWITCH_FOLLOWLIST}"
+  local twitch_list=${TWITCH_FOLLOWLIST}
 
   # if user is set, fetch user's follow list and add them to the list
   if [[ -n ${TWITCH_USER} ]]; then 
@@ -398,7 +400,7 @@ service_twitch() { # https://www.twitch.tv/
 
   # sanitize the list for the fetch url
   local url_list
-  url_list=$(echo ${twitch_list} | sed 's/ /\,/g')
+  url_list="$(echo ${twitch_list} | sed 's/ /\,/g')"
 
   # fetch the json for all followed channels
   local returned_data
@@ -410,17 +412,21 @@ service_twitch() { # https://www.twitch.tv/
   # create new database
   local new_online_json
   new_online_json="$(echo "${returned_data}" | jq '
-    [.streams[] |
-    {name:.channel.name,
-    display_name:.channel.display_name,
-    game:.channel.game,
-    status:.channel.status,
-    url:.channel.url}]')"
+    [
+      .streams[] |
+        {
+          name: .channel.name,
+          display_name: .channel.display_name,
+          game: .channel.game,
+          status: .channel.status,
+          url: .channel.url
+        }
+    ]')"
 
   # notify for new streams
   for channel in ${twitch_list}; do
     local output
-    output=$(notifier_gateway 'twitch' "${new_online_json}" ${channel})
+    output="$(notifier_gateway 'twitch' "${new_online_json}" ${channel})"
     # if we get a broken result, replace the old one
     if [[ $? != 0 ]]; then
       # remove entry
@@ -445,7 +451,7 @@ service_hitbox() { # http://www.hitbox.tv/
   # use the specified followlist, if set
   local hitbox_list="${HITBOX_FOLLOWLIST}"
   # if user is set, fetch user's follow list and add them to the list
-  if [[ -n ${HITBOX_USER} ]]; then
+  if [[ -n "${HITBOX_USER}" ]]; then
     hitbox_list="${hitbox_list} \
     "$(curl -s \
     -X GET "https://api.hitbox.tv/following/user/?user_name=${HITBOX_USER}" \
@@ -480,23 +486,30 @@ service_hitbox() { # http://www.hitbox.tv/
         sstatus="$(db_get 'hitbox' ${channel} 'status')"
         slink="$(db_get 'hitbox' ${channel} 'url')"
         new_online_json="$(echo '\
-          [{"name":"'${name}'", \
-          "display_name":"'${sdisplay_name}'", \
-          "game":"'"${sgame}"'", \
-          "status":'"$(echo "${sstatus}" | jq -R '.')"', \
-          "url": "'"${slink}"'"}]' \
-          | jq "${new_online_json}"' + .')"
+          [
+            {
+              "name": "'${name}'",
+              "display_name": "'${sdisplay_name}'",
+              "game": "'"${sgame}"'",
+              "status": '"$(echo "${sstatus}" | jq -R '.')"',
+              "url": "'"${slink}"'"
+            }
+          ]' | jq "${new_online_json}"' + .')"
       fi
 
     elif [[ "${is_live}" == "1" ]]; then
       # insert into new database
       new_online_json="$(echo "${returned_data}" \
-        | jq "${new_online_json}"'
-        + [{name:.livestream[] | .media_name,
-        display_name:.livestream[] | .media_display_name,
-        game:.livestream[] | .category_name,
-        status:.livestream[] | .media_status,
-        url:.livestream[] | .channel.channel_link}]')"
+        | jq "${new_online_json}"' +
+        [
+          {
+            name: .livestream[] | .media_name,
+            display_name: .livestream[] | .media_display_name,
+            game: .livestream[] | .category_name,
+            status: .livestream[] | .media_status,
+            url: .livestream[] | .channel.channel_link
+          }
+        ]')"
     fi
   done
 
@@ -531,12 +544,17 @@ service_azubu() { # http://www.azubu.tv/
   local new_online_json
   new_online_json="$(echo "${returned_data}" \
     | jq '
-    [.data [] | select(.is_live == true) |
-    {name: .user.username,
-    display_name: .user.display_name,
-    game: .category.title,
-    status: .title,
-    url: .url_channel}]')"
+    [
+      .data [] |
+      select(.is_live == true) |
+      {
+        name: .user.username,
+        display_name: .user.display_name,
+        game: .category.title,
+        status: .title,
+        url: .url_channel
+      }
+    ]')"
 
   # notify for new streams
   for channel in ${azubu_list}; do
@@ -575,7 +593,7 @@ interactive_output() { # generate the output for the interactive menu
   if [[ ${last_checked} -eq 0 ]]; then
     echo "Database too old, updating..."
     services_gateway
-    last_checked=$(cat ${DBFILE} | jq -r '.lastcheck')
+    last_checked=$(cat "${DBFILE}" | jq -r '.lastcheck')
   fi
 
   # print the header
@@ -584,7 +602,7 @@ interactive_output() { # generate the output for the interactive menu
   echo "[press q to exit]"
 
   # pretty-print the database json
-  echo -e "$(cat ${DBFILE} | jq -r '
+  echo -e "$(cat "${DBFILE}" | jq -r '
     (.twitch + .hitbox + .azubu)[] |
       [
         "\n\\033[1;34m", .display_name, "\\033[0m",
@@ -675,15 +693,15 @@ main() {
   # bootstrap
   check_system
   load_config
-  check_file ${DBFILE} "{}"
+  check_file "${DBFILE}" "{}"
   if [[ "${debug}" == "true" ]]; then
-    check_file ${DEBUGFILE} "[]"
+    check_file "${DEBUGFILE}" "[]"
   fi
 
   # TODO this should probably be broken apart and put in it's own function
   # cleanup: if the database file is older than 2 hours, consider it outdated
   # and remove its contents
-  [[ -s ${DBFILE} && $(($(date +%s)-$(cat ${DBFILE} | jq -r '.lastcheck // 0'))) -gt 7200 ]] && echo "{}" > ${DBFILE}
+  [[ -s "${DBFILE}" && $(($(date +%s)-$(cat "${DBFILE}" | jq -r '.lastcheck // 0'))) -gt 7200 ]] && echo "{}" > "${DBFILE}"
 
   # check if we are supposed to be running in interactive mode
   if [[ "${interactive}" == "true" ]]; then
