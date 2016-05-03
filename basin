@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
-# basin - collect all the streams you care about in one place
+# basin - all the streams you care about in once place
 # by BrowncoatShadow and Crendgrim
 # <https://github.com/BrowncoatShadow/basin>
 
-# TODO Re-implement debug functionality
-# TODO Re-implement command line arguments for passing custom lists
-
 ### Helper Functions
-get_system() { # determine os type and take action accordingly
+check_system() { # platform specific fixes and function definitions
   local system_type
   system_type="$(uname)"
   if [[ "${system_type}" == "Darwin" ]]; then # OS X
@@ -34,7 +31,35 @@ depends_on() { # check for a given dependency, exit if missing
     exit 1
   fi
 }
-generate_config() { # setup function for generating basinrc
+load_config() { # load configuration from file
+  # check if alternative config file is defined
+  if [[ -n "${ALT_CONFIG}" ]]; then
+    # if the config file does not exist yet, exit with a descriptive error message
+    if [[ ! -f "${ALT_CONFIG}" ]]; then
+      error "The specified configuration file ${ALT_CONFIG} is missing."
+      error "You can create it by copying the default configuration file at \`${HOME}/.config/basinrc\`."
+      error "If that file does not exist, you can create it by calling \`basin -C\`."
+      exit 1
+    fi
+
+    # use alt config file if defined
+    CFGFILE=${ALT_CONFIG}
+  else
+    # if the config file does not exist yet, exit with a descriptive error message
+    if [[ ! -f "${HOME}/.config/basinrc" ]]; then
+      error "The default configuration file ${HOME}/.config/basinrc is missing."
+      error "You can create it by calling \`basin -C\`."
+      exit 1
+    fi
+
+    # use default config file
+    CFGFILE=${HOME}/.config/basinrc
+  fi
+
+  # load config file
+  source ${CFGFILE}
+}
+init_config() { # generate a default configuration file
   # if the file exists already, ask the user if he really wants to replace it
   if [[ -f "${HOME}/.config/basinrc" ]]; then
     local prompt_string="The configuration file \`${HOME}/.config/basinrc\` exists already. Are you sure you want to replace it? [y/N] "
@@ -58,10 +83,10 @@ generate_config() { # setup function for generating basinrc
 #	NOTE: This functionality is currently broken.
 #	default: DEBUGFILE=${HOME}/.local/share/basin/debug.json
 # MODULE - The notification module to use.
-#	default: MODULE=echo_notify
+#	default: MODULE=notifier_echo
 DBFILE=${HOME}/.local/share/basin/online.json
 DEBUGFILE=${HOME}/.local/share/basin/debug.json
-MODULE=echo_notify
+MODULE=notifier_echo
 
 
 ### SERVICE SETTINGS
@@ -119,8 +144,8 @@ CONFIG
   # open the new basinrc with the users ${EDITOR}, so they can configure it
   ${EDITOR} ${HOME}/.config/basinrc
 }
-setup_cron() { # setup function for creating cronjob
-  # check if our cronjob exists already skip this step if it does
+init_cron() { # create cronjob
+  # check if job already exists in crontab, skip this step if it does
   # TODO this can be much cleaner
   local croncheck
   croncheck=$(crontab -l 2> /dev/null | grep -q 'basin'  && echo 'exists')
@@ -145,34 +170,6 @@ setup_cron() { # setup function for creating cronjob
     | { cat; echo "*/1 * * * * ${source_dir}/basin"; } \
     | crontab -
 }
-load_config() { # load configuration from file
-  # check if alternative config file is defined
-  if [[ -n "${ALT_CONFIG}" ]]; then
-    # if the config file does not exist yet, exit with a descriptive error message
-    if [[ ! -f "${ALT_CONFIG}" ]]; then
-      error "The specified configuration file ${ALT_CONFIG} is missing."
-      error "You can create it by copying the default configuration file at \`${HOME}/.config/basinrc\`."
-      error "If that file does not exist, you can create it by calling \`basin -C\`."
-      exit 1
-    fi
-
-    # use alt config file if defined
-    CFGFILE=${ALT_CONFIG}
-  else
-    # if the config file does not exist yet, exit with a descriptive error message
-    if [[ ! -f "${HOME}/.config/basinrc" ]]; then
-      error "The default configuration file ${HOME}/.config/basinrc is missing."
-      error "You can create it by calling \`basin -C\`."
-      exit 1
-    fi
-
-    # use default config file
-    CFGFILE=${HOME}/.config/basinrc
-  fi
-
-  # load config file
-  source ${CFGFILE}
-}
 check_file() { # generate given folders and files if they do not exist
   if [[ ! -f ${1} ]]; then
     mkdir -p $(dirname ${1})
@@ -182,34 +179,40 @@ check_file() { # generate given folders and files if they do not exist
     echo ${2} > ${1}
   fi
 }
-get_data() { # get data from json object
+json_get() { # get data from json object
   echo "${1}" | jq -r '.[] | select(.name=="'${2}'") | .'${3}
 }
-get_db() { # get data from the database
+db_get() { # get data from the database
   cat ${DBFILE} | jq -r '(.'${1}' // [])[] | select(.name=="'${2}'") | .'${3}
 }
-check_notify() { # check old and new online list and notify accordingly
-  local service="${1}"
-  local new_online_json="${2}"
-  local channel="${3}"
+db_update() { # save given json object to the DBFILE
+  if [[ -n "${DBFILE}" ]]; then
+    echo "${1}" \
+      | jq '. + {lastcheck:'$(date +%s)'}' > ${DBFILE}
+  fi
+}
+notifier_gateway() { # determine if a channel merits notification, call notifier plugins
+  local service="${1}" # the services, as named in the DBFILE
+  local new_online_json="${2}" # JSON object parsed by service plugin
+  local channel="${3}" # channel to check against service and db
 
   # check if stream is active
   local name
-  name=$(get_data "${new_online_json}" "${channel}" 'name')
+  name=$(json_get "${new_online_json}" "${channel}" 'name')
   if [[ "${name}" == "${channel}" ]]; then
     # check if it has been active since last check
     if [[ -n "${DBFILE}" ]]; then
-      dbcheck=$(get_db ${service} ${name} 'name')
+      dbcheck=$(db_get ${service} ${name} 'name')
     fi
 
     local notify=true
 
     # grab important info from json check
     local sdisplay_name sgame slink sstatus
-    sdisplay_name="$(get_data "${new_online_json}" "${channel}" 'display_name')"
-    sgame="$(get_data "${new_online_json}" "${channel}" 'game')"
-    slink="$(get_data "${new_online_json}" "${channel}" 'url')"
-    sstatus="$(get_data "${new_online_json}" "${channel}" 'status')"
+    sdisplay_name="$(json_get "${new_online_json}" "${channel}" 'display_name')"
+    sgame="$(json_get "${new_online_json}" "${channel}" 'game')"
+    slink="$(json_get "${new_online_json}" "${channel}" 'url')"
+    sstatus="$(json_get "${new_online_json}" "${channel}" 'status')"
 
     # sometimes, the api sends broken results handle these gracefully
     if [[ "${sgame}" == null && "${sstatus}" == null ]]; then
@@ -217,10 +220,10 @@ check_notify() { # check old and new online list and notify accordingly
       # don't re-notify
       if [[ -n "${dbcheck}" ]]; then
         # Recover the old data.
-        sdisplay_name="$(get_db ${service} ${name} 'display_name')"
-        sgame="$(get_db ${service} ${name} 'game')"
-        sstatus="$(get_db ${service} ${name} 'status')"
-        slink="$(get_db ${service} ${name} 'url')"
+        sdisplay_name="$(db_get ${service} ${name} 'display_name')"
+        sgame="$(db_get ${service} ${name} 'game')"
+        sstatus="$(db_get ${service} ${name} 'status')"
+        slink="$(db_get ${service} ${name} 'url')"
         # Output the broken stream.
         # This output can be used by the service plugins to replace the broken
         # record, so it does not show up in the database.
@@ -239,8 +242,8 @@ check_notify() { # check old and new online list and notify accordingly
     if [[ -n "${dbcheck}" ]]; then
       notify=false
       local dbgame dbstatus
-      dbgame="$(get_db ${service} ${name} 'game')"
-      dbstatus="$(get_db ${service} ${name} 'status')"
+      dbgame="$(db_get ${service} ${name} 'game')"
+      dbstatus="$(db_get ${service} ${name} 'status')"
       # notify when game or status change
       if [[ "${dbgame}" != "${sgame}" || "${dbstatus}" != "${sstatus}" ]]; then
         notify=true
@@ -252,26 +255,36 @@ check_notify() { # check old and new online list and notify accordingly
     fi
   fi
 }
+services_gateway() { # call each service plugin, collect their data for database
+  # initialize global that will be updated by each service function
+  new_online_db='{}'
+  # call the plugin for each service
+  service_twitch
+  service_hitbox
+  service_azubu
+  # send the updated data to the database
+  db_update "${new_online_db}"
+}
 
-### Notifiers
-# These are the functions that are called whenever a stream changes its status
-# to execute the user-visible notification.
+### Notifier Plugins
+# Plugins to used to create some form of user-visible notification when a
+# channel changes its status.
 # Each notifier gets the following parameters:
 #   ${1}: The display name of the stream; the user-facing channel name.
 #   ${2}: The game that is currently being played. Can be empty.
 #   ${3}: The channel's status text, a descriptive caption set by the broadcaster.
 #   ${4}: The link to the channel, correctly formatted for the service.
 #   ${5}: The service the livestream is on.
-echo_notify() { # notify by printing to STDOUT in the terminal
+notifier_echo() { # notify by printing to STDOUT in the terminal
   echo "${5} | ${1} [${2}]: ${3} <${4}>"
 }
-kdialog_notify() { # notify by KDialog popup
+notifier_kdialog() { # notify by KDialog popup
   kdialog \
     --title "${1} is now live on ${5}" \
     --icon "video-player" \
     --passivepopup "<b>${2}</b><br>${3}"
 }
-osx_notify() { # notify with OS X native notifications
+notifier_osx() { # notify with OS X native notifications
   # check which notification type to use
   if [[ "${OSX_TERMNOTY}" == "true" ]]; then
     # send using terminal-notifier
@@ -288,7 +301,7 @@ osx_notify() { # notify with OS X native notifications
       subtitle \"${1} is now streaming ${2}\""
   fi
 }
-pb_notify() { # notify by PushBullet API notification
+notifier_pushbullet() { # notify by PushBullet API notification
   # make sure we have a token
   if [[ -z "${PB_TOKEN}" ]]; then
     error "You need to set PB_TOKEN in your settings file."
@@ -348,14 +361,23 @@ pb_notify() { # notify by PushBullet API notification
   fi
 }
 
-### Services
-# The plugins for the different streaming services. These functions are
-# responsible for fetching data from the foreign APIs, parsing this data and
-# calling check_notify() for any live streams. That function will then decide
-# whether to send a notification. Also, these plugins will output all current
-# live channels as JSON, which then gets accumulated and saved into the database
-# file.
-get_channels_twitch() { # https://www.twitch.tv/
+### Service Plugins
+# Plugins for specific streaming services. Each plugin is called by services_gateway()
+# whenever the local database needs to be updated. They are responsible for
+# fetching data from their foreign APIs, parsing this data, then performing
+# two main functions with that data:
+#   - Call notifier_gateway() for each channel in its watch list, which will
+#   determine against the plugin's parsed data if the channel is online and take
+#   the proper notification actions.
+#   - At the end of the function, update services_gateway()'s global variable that
+#   contains the working JSON object of online channels to be set as the new DB.
+# Ideally, all service specific logic (config value checks, service related
+# naming, etc) should be contained within the service function. That way, adding
+# a new service plugin only consists of adding a function call to services_gateway().
+service_twitch() { # https://www.twitch.tv/
+  if [[ -z "${TWITCH_USER}" && -z "${TWITCH_FOLLOWLIST}" ]]; then
+    return 0 # nothing to check
+  fi
   # use the specified followlist, if set
   local twitch_list="${TWITCH_FOLLOWLIST}"
 
@@ -397,7 +419,7 @@ get_channels_twitch() { # https://www.twitch.tv/
   # notify for new streams
   for channel in ${twitch_list}; do
     local output
-    output=$(check_notify 'twitch' "${new_online_json}" ${channel})
+    output=$(notifier_gateway 'twitch' "${new_online_json}" ${channel})
     # if we get a broken result, replace the old one
     if [[ $? != 0 ]]; then
       # remove entry
@@ -407,9 +429,18 @@ get_channels_twitch() { # https://www.twitch.tv/
       new_online_json="$(echo "${new_online_json}" | jq '. + ['"${output}"']')"
     fi
   done
-  echo "${new_online_json}"
+
+  # return an empty array if no channel checked is online
+  if [[ -z "${new_online_json}" ]]; then
+    new_online_json="[[]]"
+  fi
+  # update the gloabl with entry for this service
+  new_online_db="$(echo "${new_online_json}" | jq "${new_online_db} + {twitch: .}")"
 }
-get_channels_hitbox() { # http://www.hitbox.tv/
+service_hitbox() { # http://www.hitbox.tv/
+  if [[ -z "${HITBOX_USER}" && -z "${HITBOX_FOLLOWLIST}" ]]; then
+    return 0 # nothing to check
+  fi
   # use the specified followlist, if set
   local hitbox_list="${HITBOX_FOLLOWLIST}"
   # if user is set, fetch user's follow list and add them to the list
@@ -439,14 +470,14 @@ get_channels_hitbox() { # http://www.hitbox.tv/
     if [[ $? == 4 ]]; then
       # insert entry recovered from database
       local sdisplay_name
-      sdisplay_name="$(get_db 'hitbox' ${channel} 'display_name')"
+      sdisplay_name="$(db_get 'hitbox' ${channel} 'display_name')"
 
       # did it even exist in the database?
       if [[ -n "${sdisplay_name}" ]]; then
         local sgame sstatus slink
-        sgame="$(get_db 'hitbox' ${channel} 'game')"
-        sstatus="$(get_db 'hitbox' ${channel} 'status')"
-        slink="$(get_db 'hitbox' ${channel} 'url')"
+        sgame="$(db_get 'hitbox' ${channel} 'game')"
+        sstatus="$(db_get 'hitbox' ${channel} 'status')"
+        slink="$(db_get 'hitbox' ${channel} 'url')"
         new_online_json="$(echo '\
           [{"name":"'${name}'", \
           "display_name":"'${sdisplay_name}'", \
@@ -470,11 +501,20 @@ get_channels_hitbox() { # http://www.hitbox.tv/
 
   # notify for new streams
   for channel in ${hitbox_list}; do
-    check_notify 'hitbox' "${new_online_json}" ${channel,,}
+    notifier_gateway 'hitbox' "${new_online_json}" ${channel,,}
   done
-  echo "${new_online_json}"
+
+  # return an empty array if no channel checked is online
+  if [[ -z "${new_online_json}" ]]; then
+    new_online_json="[[]]"
+  fi
+  # update the gloabl with entry for this service
+  new_online_db="$(echo "${new_online_json}" | jq "${new_online_db} + {hitbox: .}")"
 }
-get_channels_azubu() { http://www.azubu.tv/
+service_azubu() { # http://www.azubu.tv/
+  if [[ -z "${AZUBU_FOLLOWLIST}" ]]; then
+    return 0 # nothing to check
+  fi
   # remove duplicates from the list
   local azubu_list
   azubu_list=$(echo $(printf '%s\n' ${AZUBU_FOLLOWLIST} | sort -u))
@@ -499,9 +539,15 @@ get_channels_azubu() { http://www.azubu.tv/
 
   # notify for new streams
   for channel in ${azubu_list}; do
-    check_notify 'azubu' "${new_online_json}" ${channel}
+    notifier_gateway 'azubu' "${new_online_json}" ${channel}
   done
-  echo "${new_online_json}"
+
+  # return an empty array if no channel checked is online
+  if [[ -z "${new_online_json}" ]]; then
+    new_online_json="[[]]"
+  fi
+  # update the gloabl with entry for this service
+  new_online_db="$(echo "${new_online_json}" | jq "${new_online_db} + {azubu: .}")"
 }
 
 ### Interactive Menu
@@ -527,7 +573,7 @@ interactive_output() { # generate the output for the interactive menu
   last_checked=$(cat ${DBFILE} | jq -r '.lastcheck // 0')
   if [[ ${last_checked} -eq 0 ]]; then
     echo "Database too old, updating..."
-    main
+    services_gateway
     last_checked=$(cat ${DBFILE} | jq -r '.lastcheck')
   fi
 
@@ -603,6 +649,7 @@ main() {
   depends_on jq
   depends_on curl
 
+  # TODO rebuild option system, additional options for debug, help, lists
   # check for options
   while getopts ":c:Ci" opt; do
     case ${opt} in
@@ -610,8 +657,8 @@ main() {
         ALT_CONFIG="${OPTARG}"
         ;;
       C) # generate the config and setup the cronjob, exit after
-        generate_config
-        setup_cron
+        init_config
+        init_cron
         exit 0
         ;;
       i) # start interactive mode
@@ -625,7 +672,7 @@ main() {
   done
 
   # bootstrap
-  get_system
+  check_system
   load_config
   check_file ${DBFILE} "{}"
   if [[ "${debug}" == "true" ]]; then
@@ -641,42 +688,7 @@ main() {
   if [[ "${interactive}" == "true" ]]; then
     interactive_menu
   else # non-interactive, act normal
-    # TODO this should probably be broken out into a repeatable function
-    # call the service plugins for the configured lists, which in turn call the
-    # notification function, and saves their output to the database if wanted
-    local new_online_db='{}'
-    # check if we have a user set or any channels to follow
-    local module_json
-    if [[ -n "${TWITCH_USER}" || -n "${TWITCH_FOLLOWLIST}" ]]; then
-      module_json="$(get_channels_twitch)"
-      if [[ -z "${module_json}" ]]; then
-        module_json="[[]]"
-      fi
-      new_online_db="$(echo "${module_json}" \
-        | jq "${new_online_db} + {twitch: .}")"
-    fi
-    if [[ -n "${HITBOX_USER}" || -n "${HITBOX_FOLLOWLIST}" ]]; then
-      module_json="$(get_channels_hitbox)"
-      if [[ -z "${module_json}" ]]; then
-        module_json="[[]]"
-      fi
-      new_online_db="$(echo "${module_json}" \
-        | jq "${new_online_db} + {hitbox: .}")"
-    fi
-    if [[ -n "${AZUBU_FOLLOWLIST}" ]]; then
-      module_json="$(get_channels_azubu)"
-      if [[ -z "${module_json}" ]]; then
-        module_json="[[]]"
-      fi
-      new_online_db="$(echo "${module_json}" \
-        | jq "${new_online_db} + {azubu: .}")"
-    fi
-
-    # Save online database
-    if [[ -n "${DBFILE}" ]]; then
-      echo "${new_online_db}" \
-        | jq '. + {lastcheck:'$(date +%s)'}' > ${DBFILE}
-    fi
+    services_gateway
   fi
 }
 main "$@"
