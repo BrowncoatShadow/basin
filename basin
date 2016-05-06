@@ -124,16 +124,10 @@ AZUBU_FOLLOWLIST=""
 #
 # PB_TOKEN - Pushbullet access token. Find at <https://www.pushbullet.com/account>
 #	default: PB_TOKEN=
-# PB_URLTARGET - Space seperated list of pushbullet device_idens to send the URL to.
-#	default: PB_URLTARGET=""
-# PB_URITARGET - Space seperated list of pushbullet device_idens to send the URI to.
-#	default: PB_URLTARGET=""
-# PB_ALLURI - Change to 'true' to use application URI instead of URL when sending to all targets.
-#	default: PB_URI=false
+# PB_TARGET - Space seperated list of pushbullet device_idens to send the notification to. If this is not set, notification will be sent to all devices.
+#	default: PB_TARGET=""
 PB_TOKEN=
-PB_URLTARGET=""
-PB_URITARGET=""
-PB_ALLURI=false
+PB_TARGET=""
 
 ### OS X SETTINGS
 # OSX_TERMNOTY - Set to 'true' to use terminal-notifier app instead of applescript. This enables clicking the notification to launch URL.
@@ -285,56 +279,35 @@ notifier::pushbullet() { # notify by PushBullet API notification
     exit 1
   fi
 
-  # TODO handle URI for services other than twitch
   # place the arguments from script into variables that the functions can use
-  local name game stat url uri
-  name="${1}"; game="${2}"; stat="${3}"; url="${4}"; uri="twitch://stream/${1}"
+  local name game stat url
+  name="${1}"; game="${2}"; stat="${3}"; url="${4}";
 
-  # create functions for sending pushes
-  allpush() {
+  # function to send pushes
+  push() {
+    local data
+    data='{
+      "device_iden": "'"${1}"'",
+      "type": "link",
+      "title": "'"${name}"'",
+      "body": "'"[${game}] \\n${stat}"'",
+      "url": "'"${url}"'"
+    }'
     curl -s \
-      --header 'Authorization: Bearer '${PB_TOKEN}'' \
       -X POST https://api.pushbullet.com/v2/pushes \
+      --header 'Access-Token: '${PB_TOKEN}'' \
       --header 'Content-Type: application/json' \
-      --data-binary '{"type": "link", "title": "'"${name}"'", "body": "'"[${game}] \\n${stat}"'", "url": "'"${1}"'"}' \
+      --data-binary "${data}" \
       > /dev/null
   }
 
-  targetpush() {
-    curl -s \
-      --header 'Authorization: Bearer '${PB_TOKEN}'' \
-      -X POST https://api.pushbullet.com/v2/pushes \
-      --header 'Content-Type: application/json' \
-      --data-binary '{"device_iden": "'"${1}"'", "type": "link", "title": "'"${name}"'", "body": "'"[${game}] \\n${stat}"'", "url": "'"${2}"'"}' \
-      > /dev/null
-  }
-
-  # if no targets are defined, send to all targets
-  if [[ -z "${PB_URLTARGET}" && -z "${PB_URITARGET}" ]]; then
-    # if PB_URI is true, send the uri link instead of url
-    local link
-    if [[ "${PB_ALLURI}" == "true" ]]; then
-      link="${uri}"
-    else
-      link="${url}"
-    fi
-
-    # push to all
-    allpush ${link}
-  fi
-
-  # for each target in url list, send a push
-  if [[ -n "${PB_URLTARGET}" ]]; then
-    for target in ${PB_URLTARGET}; do
-      targetpush ${target} ${url}
+  # push to any targets that are defined
+  if [[ -n "${PB_TARGET}" ]]; then
+    for target in ${PB_TARGET}; do
+      push ${target}
     done
-  fi
-
-  # for each target in uri list, send a push
-  if [[ -n "${PB_URITARGET}" ]]; then
-    for target in ${PB_URITARGET}; do
-      targetpush ${target} ${uri}
-    done
+  else # if no targets, push to all
+    push
   fi
 }
 
