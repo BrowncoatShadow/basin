@@ -214,32 +214,6 @@ notifier_gateway() { # determine if a channel merits notification, call notifier
     slink="$(json_get "${new_online_json}" "${channel}" 'url')"
     sstatus="$(json_get "${new_online_json}" "${channel}" 'status')"
 
-    # sometimes, the api sends broken results handle these gracefully
-    if [[ "${sgame}" == null && "${sstatus}" == null ]]; then
-      # if the stream was live before, assume the results to be broken, so we
-      # don't re-notify
-      if [[ -n "${dbcheck}" ]]; then
-        # Recover the old data.
-        sdisplay_name="$(db_get ${service} ${name} 'display_name')"
-        sgame="$(db_get ${service} ${name} 'game')"
-        sstatus="$(db_get ${service} ${name} 'status')"
-        slink="$(db_get ${service} ${name} 'url')"
-        # Output the broken stream.
-        # This output can be used by the service plugins to replace the broken
-        # record, so it does not show up in the database.
-        echo null | jq '
-          {
-            "name": "'"${name}"'",
-            "display_name": "'"${sdisplay_name}"'",
-            "game": "'"${sgame}"'",
-            "status": '"$(echo "${sstatus}" | jq -R '.')"',
-            "url": "'"${slink}"'"
-          }'
-      fi
-      # otherwise ignore the broken result to not get a null/null notification
-      return -1
-    fi
-
     # already streaming last time, check for updates
     if [[ -n "${dbcheck}" ]]; then
       notify=false
@@ -425,23 +399,38 @@ service::twitch() { # https://www.twitch.tv/
 
   # notify for new streams
   for channel in ${twitch_list}; do
-    local output
-    output="$(notifier_gateway 'twitch' "${new_online_json}" ${channel})"
-    # if we get a broken result, replace the old one
-    if [[ $? != 0 ]]; then
-      # remove entry
-      new_online_json="$(echo "${new_online_json}" \
-        | jq 'del(.[] | select(.name=="'${channel}'"))')"
-      # re-insert recovered entry
-      new_online_json="$(echo "${new_online_json}" | jq '. + ['"${output}"']')"
+    # sometimes, the api sends broken results handle these gracefully
+    local check_game check_status
+    check_game="$(json_get "${new_online_json}" "${channel}" 'game')"
+    check_status="$(json_get "${new_online_json}" "${channel}" 'status')"
+    if [[ "${check_game}" == null && "${check_status}" == null ]]; then
+      # if the stream was live before, assume the results to be broken, so we
+      # don't re-notify
+      if [[ -n "${DBFILE}" ]]; then
+        # recover existing db entry if it exists
+        local recovered_data
+        recovered_data="$(db_get 'twitch' ${channel})"
+        if [[ -n "${recovered_data}" ]]; then
+          # remove entry
+          new_online_json="$(echo "${new_online_json}" \
+            | jq 'del(.[] | select(.name=="'${channel}'"))')"
+          # re-insert recovered entry
+          new_online_json="$(echo "${new_online_json}" | jq '. + ['"${recovered_data}"']')"
+        fi
+      fi
+      # otherwise ignore the broken result to not get a null/null notification
+      continue
     fi
+
+    # if result is not broken, send it to notifier gateway
+    notifier_gateway 'twitch' "${new_online_json}" ${channel}
   done
 
   # return an empty array if no channel checked is online
   if [[ -z "${new_online_json}" ]]; then
     new_online_json="[[]]"
   fi
-  # update the gloabl with entry for this service
+  # update the global with entry for this service
   new_online_db="$(echo "${new_online_json}" | jq "${new_online_db} + {twitch: .}")"
 }
 service::hitbox() { # http://www.hitbox.tv/
@@ -522,7 +511,7 @@ service::hitbox() { # http://www.hitbox.tv/
   if [[ -z "${new_online_json}" ]]; then
     new_online_json="[[]]"
   fi
-  # update the gloabl with entry for this service
+  # update the global with entry for this service
   new_online_db="$(echo "${new_online_json}" | jq "${new_online_db} + {hitbox: .}")"
 }
 service::azubu() { # http://www.azubu.tv/
@@ -565,7 +554,7 @@ service::azubu() { # http://www.azubu.tv/
   if [[ -z "${new_online_json}" ]]; then
     new_online_json="[[]]"
   fi
-  # update the gloabl with entry for this service
+  # update the global with entry for this service
   new_online_db="$(echo "${new_online_json}" | jq "${new_online_db} + {azubu: .}")"
 }
 
