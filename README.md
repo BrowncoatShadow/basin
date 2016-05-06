@@ -18,6 +18,7 @@ on your machine or push them to a service like
 - `kdialog`
 - `osx` OS X's Notification Center.
 - `pushbullet`
+- `terminal_notifier` More robust Notification Center messages.
 
 
 ## Dependencies

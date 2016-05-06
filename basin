@@ -128,11 +128,6 @@ AZUBU_FOLLOWLIST=""
 #	default: PB_TARGET=""
 PB_TOKEN=
 PB_TARGET=""
-
-### OS X SETTINGS
-# OSX_TERMNOTY - Set to 'true' to use terminal-notifier app instead of applescript. This enables clicking the notification to launch URL.
-#	default: OSX_TERMNOTY=false
-OSX_TERMNOTY=false
 CONFIG
   # TODO Is this best practice?
   # open the new basinrc with the users ${EDITOR}, so they can configure it
@@ -252,22 +247,23 @@ notifier::kdialog() { # notify by KDialog popup
     --icon "video-player" \
     --passivepopup "<b>${2}</b><br>${3}"
 }
-notifier::osx() { # notify with OS X native notifications
-  # check which notification type to use
-  if [[ "${OSX_TERMNOTY}" == "true" ]]; then
-    # send using terminal-notifier
-    terminal-notifier \
-      -message "${3}" \
-      -title "${5}" \
-      -subtitle "${1} is now streaming ${2}" \
-      -open "${4}"
-  else
-    # send using OS X applescript (no url support)
-    osascript \
-      -e "display notification \"${3}\" \
-      with title \"${5}\" \
-      subtitle \"${1} is now streaming ${2}\""
-  fi
+notifier::osx() { # OS X Notification Center with applescript
+  osascript \
+    -e "display notification \"${3}\" \
+    with title \"${5}\" \
+    subtitle \"${1} is playing ${2}\""
+}
+notifier::terminal_notifier() { # OS X Notification Center with terminal-notifier
+  tn_sanitize() { # escape characters known to cause issues at the beginning of strings
+    local escape='[<'
+    echo "${1}" | sed "s/^[${escape}]/\\\&/"
+  }
+  terminal-notifier \
+    -title "${5}" \
+    -subtitle "${1} is playing ${2}" \
+    -message "$(tn_sanitize "${3}")" \
+    -open "${4}" \
+    >/dev/null # silently fail instead of printing useage
 }
 notifier::pushbullet() { # notify by PushBullet API notification
   # make sure we have a token
