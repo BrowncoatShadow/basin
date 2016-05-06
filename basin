@@ -63,8 +63,8 @@ init_config() { # generate a default configuration file
   if [[ -f "${HOME}/.config/basinrc" ]]; then
     local prompt_string="The configuration file \`${HOME}/.config/basinrc\` exists already. Are you sure you want to replace it? [y/N] "
     read -p "${prompt_string}"
-    # TODO replace this with extended regular expression
-    if [[ "${REPLY}" != "y" && "${REPLY}" != "Y" && "${REPLY}" != "yes" && "${REPLY}" != "YES" ]]; then
+    if [[ ! "${REPLY}" =~ ^[yY].* ]]; then
+      echo "Aborting config file creation..."
       return 0
     fi
   fi
@@ -149,9 +149,9 @@ init_cron() { # create cronjob
 
   local prompt_string="Would you like basin to add itself to your crontab? (This runs the script every minute.) [y/N] "
   read -p "${prompt_string}"
-  # TODO replace this with extended regular expression
-  if [[ "${REPLY}" != "y" && "${REPLY}" != "Y" && "${REPLY}" != "yes" && "${REPLY}" != "YES" ]]; then
-    return
+  if [[ ! "${REPLY}" =~ ^[yY].* ]]; then
+    echo "Aborting crontab entry creation..."
+    return 0
   fi
 
   local source_dir
