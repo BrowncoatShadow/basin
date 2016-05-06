@@ -139,11 +139,8 @@ CONFIG
   ${EDITOR} "${HOME}/.config/basinrc"
 }
 init_cron() { # create cronjob
-  # check if job already exists in crontab, skip this step if it does
-  # TODO this can be much cleaner
-  local croncheck
-  croncheck="$(crontab -l 2> /dev/null | grep -q 'basin' && echo 'exists')"
-  if [[ "${croncheck}" == "exists" ]]; then
+  # check if entry already exists in crontab, skip this step if it does
+  if crontab -l 2> /dev/null | grep -Fq 'basin'; then
     return
   fi
 
