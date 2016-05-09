@@ -165,8 +165,11 @@ check_file() { # generate given folders and files if they do not exist
     echo ${2} > ${1}
   fi
 }
-json_get() { # get data from json object
+json_get() { # get channel data from an array of channel objects
   echo "${1}" | jq -r '.[] | select(.name=="'${2}'") | .'${3}
+}
+chan_get() { # get a value from a channel object
+  echo "${1}" | jq -r .${2}
 }
 db_get() { # get data from the database
   cat "${DBFILE}" \
@@ -208,38 +211,35 @@ notifier_gateway() { # determine if a channel merits notification, call notifier
   # check if stream is active
   local name
   name="$(json_get "${new_online_json}" "${channel}" 'name')"
-  local sservice
-  sservice="$(json_get "${new_online_json}" "${channel}" 'service')"
   if [[ "${name}" == "${channel}" ]]; then
-    # check if it has been active since last check
-    if [[ -n "${DBFILE}" ]]; then
-      dbcheck="$(db_get ${sservice} ${name} 'name')"
-    fi
-
+    # notify unless something says not to
     local notify=true
 
-    # grab important info from json check
-    local sdisplay_name sgame slink sstatus
-    sdisplay_name="$(json_get "${new_online_json}" "${channel}" 'display_name')"
-    sgame="$(json_get "${new_online_json}" "${channel}" 'game')"
-    slink="$(json_get "${new_online_json}" "${channel}" 'url')"
-    sstatus="$(json_get "${new_online_json}" "${channel}" 'status')"
+    # check if it has been active since last check
+    if [[ -n "${DBFILE}" ]]; then
+      local service dbcheck
+      service="$(json_get "${new_online_json}" "${channel}" 'service')"
+      dbcheck="$(db_get ${service} ${name} 'name')"
 
-    # already streaming last time, check for updates
-    if [[ -n "${dbcheck}" ]]; then
-      notify=false
-      local dbgame dbstatus
-      dbgame="$(db_get ${sservice} ${name} 'game')"
-      dbstatus="$(db_get ${sservice} ${name} 'status')"
-      # notify when game or status change
-      if [[ "${dbgame}" != "${sgame}" || "${dbstatus}" != "${sstatus}" ]]; then
-        notify=true
+      # already streaming last time, check for updates
+      if [[ -n "${dbcheck}" ]]; then
+        notify=false
+        local dbgame dbstatus sgame sstatus
+        dbgame="$(db_get ${service} ${name} 'game')"
+        dbstatus="$(db_get ${service} ${name} 'status')"
+        sgame="$(json_get "${new_online_json}" "${channel}" 'game')"
+        sstatus="$(json_get "${new_online_json}" "${channel}" 'status')"
+        # notify when game or status change
+        if [[ "${dbgame}" != "${sgame}" || "${dbstatus}" != "${sstatus}" ]]; then
+          notify=true
+        fi
       fi
     fi
+
     if [[ ${notify} == true ]]; then
       # send notification by using the module and giving it the arguments
       local notifier="notifier::${NOTIFIER}"
-      ${notifier} "${sdisplay_name}" "${sgame}" "${sstatus}" "${slink}" "${sservice}"
+      ${notifier} "$(json_get "${new_online_json}" "${channel}")"
     fi
   fi
 }
@@ -256,38 +256,56 @@ services_gateway() { # call each service plugin, collect their data for database
 
 ### Notifier Plugins
 # Plugins to used to create some form of user-visible notification when a
-# channel changes its status.
-# Each notifier gets the following parameters:
-#   ${1}: The display name of the stream; the user-facing channel name.
-#   ${2}: The game that is currently being played. Can be empty.
-#   ${3}: The channel's status text, a descriptive caption set by the broadcaster.
-#   ${4}: The link to the channel, correctly formatted for the service.
-#   ${5}: The service the livestream is on.
+# channel changes its status. notifier_gateway() calls a notifier plugin with a
+# channel JSON object as the only argument. A notifier can pull that
+# information it wants out of the that object.
 notifier::echo() { # notify by printing to STDOUT in the terminal
-  echo "${5} | ${1} [${2}]: ${3} <${4}>"
+  local service display_name game status url
+  service="$(chan_get "${1}" 'service')"
+  display_name="$(chan_get "${1}" 'display_name')"
+  game="$(chan_get "${1}" 'game')"
+  status="$(chan_get "${1}" 'status')"
+  url="$(chan_get "${1}" 'url')"
+  echo "${service} | ${display_name} [${game}]: ${status} <${url}>"
 }
 notifier::kdialog() { # notify by KDialog popup
+  local service display_name game status
+  service="$(chan_get "${1}" 'service')"
+  display_name="$(chan_get "${1}" 'display_name')"
+  game="$(chan_get "${1}" 'game')"
+  status="$(chan_get "${1}" 'status')"
   kdialog \
-    --title "${1} is now live on ${5}" \
+    --title "${display_name} is now live on ${service}" \
     --icon "video-player" \
-    --passivepopup "<b>${2}</b><br>${3}"
+    --passivepopup "<b>${game}</b><br>${status}"
 }
 notifier::osx() { # OS X Notification Center with applescript
+  local service display_name game status
+  service="$(chan_get "${1}" 'service')"
+  display_name="$(chan_get "${1}" 'display_name')"
+  game="$(chan_get "${1}" 'game')"
+  status="$(chan_get "${1}" 'status')"
   osascript \
-    -e "display notification \"${3}\" \
-    with title \"${5}\" \
-    subtitle \"${1} is playing ${2}\""
+    -e "display notification \"${status}\" \
+    with title \"${service}\" \
+    subtitle \"${display_name} is playing ${game}\""
 }
 notifier::terminal_notifier() { # OS X Notification Center with terminal-notifier
+  local service display_name game status url
+  service="$(chan_get "${1}" 'service')"
+  display_name="$(chan_get "${1}" 'display_name')"
+  game="$(chan_get "${1}" 'game')"
+  status="$(chan_get "${1}" 'status')"
+  url="$(chan_get "${1}" 'url')"
   tn_sanitize() { # escape characters known to cause issues at the beginning of strings
     local escape='[<'
     echo "${1}" | sed "s/^[${escape}]/\\\&/"
   }
   terminal-notifier \
-    -title "${5}" \
-    -subtitle "${1} is playing ${2}" \
-    -message "$(tn_sanitize "${3}")" \
-    -open "${4}" \
+    -title "${service}" \
+    -subtitle "${display_name} is playing ${game}" \
+    -message "$(tn_sanitize "${status}")" \
+    -open "${url}" \
     >/dev/null # silently fail instead of printing useage
 }
 notifier::pushbullet() { # notify by PushBullet API notification
@@ -296,10 +314,12 @@ notifier::pushbullet() { # notify by PushBullet API notification
     error "You need to set PB_TOKEN in your settings file."
     exit 1
   fi
-
-  # place the arguments from script into variables that the functions can use
-  local name game stat url
-  name="${1}"; game="${2}"; stat="${3}"; url="${4}";
+  local service display_name game status url
+  service="$(chan_get "${1}" 'service')"
+  display_name="$(chan_get "${1}" 'display_name')"
+  game="$(chan_get "${1}" 'game')"
+  status="$(chan_get "${1}" 'status')"
+  url="$(chan_get "${1}" 'url')"
 
   # function to send pushes
   push() {
@@ -307,8 +327,8 @@ notifier::pushbullet() { # notify by PushBullet API notification
     data='{
       "device_iden": "'"${1}"'",
       "type": "link",
-      "title": "'"${name}"'",
-      "body": "'"[${game}] \\n${stat}"'",
+      "title": "'"${display_name} on ${service}"'",
+      "body": "'"[${game}] \\n${status}"'",
       "url": "'"${url}"'"
     }'
     curl -s \
@@ -337,8 +357,8 @@ notifier::pushbullet() { # notify by PushBullet API notification
 #   - Call notifier_gateway() for each channel in its watch list, which will
 #   determine against the plugin's parsed data if the channel is online and take
 #   the proper notification actions.
-#   - At the end of the function, update services_gateway()'s global variable that
-#   contains the working JSON object of online channels to be set as the new DB.
+#   - At the end of the function, call db_add() with the JSON array of online
+#   channel objects to be sent to the database.
 # Ideally, all service specific logic (config value checks, service related
 # naming, etc) should be contained within the service function. That way, adding
 # a new service plugin only consists of adding a function call to services_gateway().
