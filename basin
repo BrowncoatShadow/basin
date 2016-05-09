@@ -172,10 +172,16 @@ db_get() { # get data from the database
   cat "${DBFILE}" \
     | jq -r '(.online // [])[] | select(.service=="'${1}'" and .name=="'${2}'") | .'${3}
 }
-db_update() { # save given json object to the DBFILE
+db_add() { # add arrayed online channel objects to global list to be added to db
+  # update the global with entries if they exist
+  if [[ -n "${1}" ]]; then
+    new_online_db="$(echo "${new_online_db}" | jq ". + ${1}")"
+  fi
+}
+db_commit() { # save given json object to the DBFILE
   if [[ -n "${DBFILE}" ]]; then
     echo "${1}" \
-      | jq '{online: .} + {lastcheck:'$(date +%s)'}' > ${DBFILE}
+      | jq '{online: ., lastcheck: '$(date +%s)'}' > ${DBFILE}
   fi
 }
 db_recover() { # recover an existing DB entry for broken API results
@@ -193,12 +199,6 @@ db_recover() { # recover an existing DB entry for broken API results
     echo "${json}" | jq '. + ['"${recovered_data}"']'
   else
     echo "${json}"
-  fi
-}
-db_insert() { # add arrayed online channel objects to global list to be added to db
-  # update the global with entries if they exist
-  if [[ -n "${1}" ]]; then
-    new_online_db="$(echo "${new_online_db}" | jq ". + ${1}")"
   fi
 }
 notifier_gateway() { # determine if a channel merits notification, call notifier plugins
@@ -251,7 +251,7 @@ services_gateway() { # call each service plugin, collect their data for database
   service::hitbox
   service::azubu
   # send the updated data to the database
-  db_update "${new_online_db}"
+  db_commit "${new_online_db}"
 }
 
 ### Notifier Plugins
@@ -410,7 +410,7 @@ service::twitch() { # https://www.twitch.tv/
     notifier_gateway "${new_online_json}" "${channel}"
   done
 
-  db_insert "${new_online_json}"
+  db_add "${new_online_json}"
 }
 service::hitbox() { # http://www.hitbox.tv/
   if [[ -z "${HITBOX_USER}" && -z "${HITBOX_FOLLOWLIST}" ]]; then
@@ -471,7 +471,7 @@ service::hitbox() { # http://www.hitbox.tv/
     notifier_gateway "${new_online_json}" ${channel,,}
   done
 
-  db_insert "${new_online_json}"
+  db_add "${new_online_json}"
 }
 service::azubu() { # http://www.azubu.tv/
   if [[ -z "${AZUBU_FOLLOWLIST}" ]]; then
@@ -510,7 +510,7 @@ service::azubu() { # http://www.azubu.tv/
     notifier_gateway "${new_online_json}" ${channel}
   done
 
-  db_insert "${new_online_json}"
+  db_add "${new_online_json}"
 }
 
 ### Interactive Menu
