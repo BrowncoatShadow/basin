@@ -293,6 +293,8 @@ notifier::osx() { # OS X Notification Center with applescript
 notifier::terminal_notifier() { # OS X Notification Center with terminal-notifier
   local service display_name game status url
   service="$(chan_get "${1}" 'service')"
+  service_logo="$(chan_get "${1}" 'service_logo')"
+  logo="$(chan_get "${1}" 'logo')"
   display_name="$(chan_get "${1}" 'display_name')"
   game="$(chan_get "${1}" 'game')"
   status="$(chan_get "${1}" 'status')"
@@ -305,6 +307,8 @@ notifier::terminal_notifier() { # OS X Notification Center with terminal-notifie
     -title "${service}" \
     -subtitle "${display_name} is playing ${game}" \
     -message "$(tn_sanitize "${status}")" \
+    -appIcon "${service_logo}" \
+    -contentImage "${logo}" \
     -open "${url}" \
     >/dev/null # silently fail instead of printing useage
 }
@@ -401,11 +405,13 @@ service::twitch() { # https://www.twitch.tv/
       .streams[] |
         {
           service: "Twitch",
+          service_logo: "http://s.jtvnw.net/jtv_user_pictures/hosted_images/GlitchIcon_WhiteonPurple.png",
           name: .channel.name,
           display_name: .channel.display_name,
           game: .channel.game,
           status: .channel.status,
-          url: .channel.url
+          url: .channel.url,
+          logo: .channel.logo
         }
     ]')"
 
@@ -474,13 +480,16 @@ service::hitbox() { # http://www.hitbox.tv/
       new_online_json="$(echo "${returned_data}" \
         | jq "${new_online_json}"' +
         [
+          .livestream[] |
           {
             service: "Hitbox",
-            name: .livestream[] | .media_name,
-            display_name: .livestream[] | .media_display_name,
-            game: .livestream[] | .category_name,
-            status: .livestream[] | .media_status,
-            url: .livestream[] | .channel.channel_link
+            service_logo: "http://i.imgur.com/ogo74T5.png",
+            name: .media_name,
+            display_name: .media_display_name,
+            game: .category_name,
+            status: .media_status,
+            url: .channel.channel_link,
+            logo: ("http://edge.sf.hitbox.tv" + .channel.user_logo)
           }
         ]')"
     fi
@@ -517,11 +526,13 @@ service::azubu() { # http://www.azubu.tv/
       select(.is_live == true) |
       {
         service: "Azubu",
+        service_logo: "http://cdn.content.azubu.tv.s3.amazonaws.com/assets/images/azubu_placeholder.png",
         name: .user.username,
         display_name: .user.display_name,
         game: .category.title,
         status: .title,
-        url: .url_channel
+        url: .url_channel,
+        logo: .user.profile.url_photo_large
       }
     ]')"
 
