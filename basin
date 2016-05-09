@@ -169,26 +169,51 @@ json_get() { # get data from json object
   echo "${1}" | jq -r '.[] | select(.name=="'${2}'") | .'${3}
 }
 db_get() { # get data from the database
-  cat "${DBFILE}" | jq -r '(.'${1}' // [])[] | select(.name=="'${2}'") | .'${3}
+  cat "${DBFILE}" \
+    | jq -r '(.online // [])[] | select(.service=="'${1}'" and .name=="'${2}'") | .'${3}
 }
 db_update() { # save given json object to the DBFILE
   if [[ -n "${DBFILE}" ]]; then
     echo "${1}" \
-      | jq '. + {lastcheck:'$(date +%s)'}' > ${DBFILE}
+      | jq '{online: .} + {lastcheck:'$(date +%s)'}' > ${DBFILE}
+  fi
+}
+db_recover() { # recover an existing DB entry for broken API results
+  local service="${1}"
+  local json="${2}"
+  local channel="${3}"
+  # recover existing db entry if it exists
+  local recovered_data
+  recovered_data="$(db_get "${service}" ${channel})"
+  if [[ -n "${recovered_data}" ]]; then
+    # remove entry
+    json="$(echo "${json}" \
+      | jq 'del(.[] | select(.name=="'${channel}'"))')"
+    # return a fixed JSON object
+    echo "${json}" | jq '. + ['"${recovered_data}"']'
+  else
+    echo "${json}"
+  fi
+}
+db_insert() { # add arrayed online channel objects to global list to be added to db
+  # update the global with entries if they exist
+  if [[ -n "${1}" ]]; then
+    new_online_db="$(echo "${new_online_db}" | jq ". + ${1}")"
   fi
 }
 notifier_gateway() { # determine if a channel merits notification, call notifier plugins
-  local service="${1}" # the services, as named in the DBFILE
-  local new_online_json="${2}" # JSON object parsed by service plugin
-  local channel="${3}" # channel to check against service and db
+  local new_online_json="${1}" # JSON object parsed by service plugin
+  local channel="${2}" # channel to check against service and db
 
   # check if stream is active
   local name
   name="$(json_get "${new_online_json}" "${channel}" 'name')"
+  local sservice
+  sservice="$(json_get "${new_online_json}" "${channel}" 'service')"
   if [[ "${name}" == "${channel}" ]]; then
     # check if it has been active since last check
     if [[ -n "${DBFILE}" ]]; then
-      dbcheck="$(db_get ${service} ${name} 'name')"
+      dbcheck="$(db_get ${sservice} ${name} 'name')"
     fi
 
     local notify=true
@@ -204,8 +229,8 @@ notifier_gateway() { # determine if a channel merits notification, call notifier
     if [[ -n "${dbcheck}" ]]; then
       notify=false
       local dbgame dbstatus
-      dbgame="$(db_get ${service} ${name} 'game')"
-      dbstatus="$(db_get ${service} ${name} 'status')"
+      dbgame="$(db_get ${sservice} ${name} 'game')"
+      dbstatus="$(db_get ${sservice} ${name} 'status')"
       # notify when game or status change
       if [[ "${dbgame}" != "${sgame}" || "${dbstatus}" != "${sstatus}" ]]; then
         notify=true
@@ -214,13 +239,13 @@ notifier_gateway() { # determine if a channel merits notification, call notifier
     if [[ ${notify} == true ]]; then
       # send notification by using the module and giving it the arguments
       local notifier="notifier::${NOTIFIER}"
-      ${notifier} "${sdisplay_name}" "${sgame}" "${sstatus}" "${slink}" "${service}"
+      ${notifier} "${sdisplay_name}" "${sgame}" "${sstatus}" "${slink}" "${sservice}"
     fi
   fi
 }
 services_gateway() { # call each service plugin, collect their data for database
   # initialize global that will be updated by each service function
-  new_online_db='{}'
+  new_online_db='[]'
   # call the plugin for each service
   service::twitch
   service::hitbox
@@ -355,6 +380,7 @@ service::twitch() { # https://www.twitch.tv/
     [
       .streams[] |
         {
+          service: "Twitch",
           name: .channel.name,
           display_name: .channel.display_name,
           game: .channel.game,
@@ -374,30 +400,17 @@ service::twitch() { # https://www.twitch.tv/
       # don't re-notify
       if [[ -n "${DBFILE}" ]]; then
         # recover existing db entry if it exists
-        local recovered_data
-        recovered_data="$(db_get 'twitch' ${channel})"
-        if [[ -n "${recovered_data}" ]]; then
-          # remove entry
-          new_online_json="$(echo "${new_online_json}" \
-            | jq 'del(.[] | select(.name=="'${channel}'"))')"
-          # re-insert recovered entry
-          new_online_json="$(echo "${new_online_json}" | jq '. + ['"${recovered_data}"']')"
-        fi
+        new_online_json="$(db_recover "${service}" "${new_online_json}" "${channel}")"
       fi
       # otherwise ignore the broken result to not get a null/null notification
       continue
     fi
 
     # if result is not broken, send it to notifier gateway
-    notifier_gateway 'twitch' "${new_online_json}" ${channel}
+    notifier_gateway "${new_online_json}" "${channel}"
   done
 
-  # return an empty array if no channel checked is online
-  if [[ -z "${new_online_json}" ]]; then
-    new_online_json="[[]]"
-  fi
-  # update the global with entry for this service
-  new_online_db="$(echo "${new_online_json}" | jq "${new_online_db} + {twitch: .}")"
+  db_insert "${new_online_json}"
 }
 service::hitbox() { # http://www.hitbox.tv/
   if [[ -z "${HITBOX_USER}" && -z "${HITBOX_FOLLOWLIST}" ]]; then
@@ -431,25 +444,9 @@ service::hitbox() { # http://www.hitbox.tv/
 
     if [[ $? == 4 ]]; then
       # insert entry recovered from database
-      local sdisplay_name
-      sdisplay_name="$(db_get 'hitbox' ${channel} 'display_name')"
-
-      # did it even exist in the database?
-      if [[ -n "${sdisplay_name}" ]]; then
-        local sgame sstatus slink
-        sgame="$(db_get 'hitbox' ${channel} 'game')"
-        sstatus="$(db_get 'hitbox' ${channel} 'status')"
-        slink="$(db_get 'hitbox' ${channel} 'url')"
-        new_online_json="$(echo '\
-          [
-            {
-              "name": "'${name}'",
-              "display_name": "'${sdisplay_name}'",
-              "game": "'"${sgame}"'",
-              "status": '"$(echo "${sstatus}" | jq -R '.')"',
-              "url": "'"${slink}"'"
-            }
-          ]' | jq "${new_online_json}"' + .')"
+      if [[ -n "${DBFILE}" ]]; then
+        # recover existing db entry if it exists
+        new_online_json="$(db_recover "${service}" "${new_online_json}" "${channel}")"
       fi
 
     elif [[ "${is_live}" == "1" ]]; then
@@ -458,6 +455,7 @@ service::hitbox() { # http://www.hitbox.tv/
         | jq "${new_online_json}"' +
         [
           {
+            service: "Hitbox",
             name: .livestream[] | .media_name,
             display_name: .livestream[] | .media_display_name,
             game: .livestream[] | .category_name,
@@ -470,15 +468,10 @@ service::hitbox() { # http://www.hitbox.tv/
 
   # notify for new streams
   for channel in ${hitbox_list}; do
-    notifier_gateway 'hitbox' "${new_online_json}" ${channel,,}
+    notifier_gateway "${new_online_json}" ${channel,,}
   done
 
-  # return an empty array if no channel checked is online
-  if [[ -z "${new_online_json}" ]]; then
-    new_online_json="[[]]"
-  fi
-  # update the global with entry for this service
-  new_online_db="$(echo "${new_online_json}" | jq "${new_online_db} + {hitbox: .}")"
+  db_insert "${new_online_json}"
 }
 service::azubu() { # http://www.azubu.tv/
   if [[ -z "${AZUBU_FOLLOWLIST}" ]]; then
@@ -503,6 +496,7 @@ service::azubu() { # http://www.azubu.tv/
       .data [] |
       select(.is_live == true) |
       {
+        service: "Azubu",
         name: .user.username,
         display_name: .user.display_name,
         game: .category.title,
@@ -513,15 +507,10 @@ service::azubu() { # http://www.azubu.tv/
 
   # notify for new streams
   for channel in ${azubu_list}; do
-    notifier_gateway 'azubu' "${new_online_json}" ${channel}
+    notifier_gateway "${new_online_json}" ${channel}
   done
 
-  # return an empty array if no channel checked is online
-  if [[ -z "${new_online_json}" ]]; then
-    new_online_json="[[]]"
-  fi
-  # update the global with entry for this service
-  new_online_db="$(echo "${new_online_json}" | jq "${new_online_db} + {azubu: .}")"
+  db_insert "${new_online_json}"
 }
 
 ### Interactive Menu
