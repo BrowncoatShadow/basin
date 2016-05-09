@@ -578,7 +578,7 @@ interactive_output() { # generate the output for the interactive menu
 
   # pretty-print the database json
   echo -e "$(cat "${DBFILE}" | jq -r '
-    (.twitch + .hitbox + .azubu)[] |
+    .online[] |
       [
         "\n\\033[1;34m", .display_name, "\\033[0m",
         (
