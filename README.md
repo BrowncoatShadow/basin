@@ -11,6 +11,7 @@ on your machine or push them to a service like
 - [azubu.tv](http://azubu.tv)
 - [hitbox.tv](http://hitbox.tv)
 - [twitch.tv](http://twitch.tv)
+- [periscope.tv](https://periscope.tv)
 
 
 ### Notifier Plugins

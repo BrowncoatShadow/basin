@@ -116,6 +116,12 @@ HITBOX_FOLLOWLIST=""
 # default: AZUBU_FOLLOWLIST=""
 AZUBU_FOLLOWLIST=""
 
+### PERISCOPE SETTINGS
+# PERISCOPE_FOLLOWLIST - List of streams to check on, divided by spaces.
+# default: PERISCOPE_FOLLOWLIST=""
+PERISCOPE_FOLLOWLIST=
+
+
 ### NOTIFIER SETTINGS
 # Settings for the user-visable notifications for changes to a stream status.
 
@@ -250,6 +256,7 @@ services_gateway() { # call each service plugin, collect their data for database
   service::twitch
   service::hitbox
   service::azubu
+  service::periscope
   # send the updated data to the database
   db_commit "${new_online_db}"
 }
@@ -538,6 +545,60 @@ service::azubu() { # http://www.azubu.tv/
 
   # notify for new streams
   for channel in ${azubu_list}; do
+    notifier_gateway "${new_online_json}" ${channel}
+  done
+
+  db_add "${new_online_json}"
+}
+service::periscope() { # https://www.periscope.tv/
+  if [[ -z "${PERISCOPE_FOLLOWLIST}" ]]; then
+    return 0 # nothing to check
+  fi
+
+  # remove duplicates from the list
+  PERISCOPE_FOLLOWLIST=$(echo $(printf '%s\n' ${PERISCOPE_FOLLOWLIST} | sort -u))
+
+  local new_online_json='[]'
+  for channel in ${PERISCOPE_FOLLOWLIST}; do
+
+    local raw_html
+    raw_html="$(curl -s https://www.periscope.tv/${channel})"
+    # Periscope's API is private. However, user pages have a meta tag with an
+    # HTML entity-encoded JSON string that contains everything we want to know.
+    # After fetching the user page, we have to get everything in the
+    # broadcast-data meta tag's value, then decode the HTML entities we know it
+    # commonly uses. End result: a JSON string we would expect from an API.
+    local broadcast_data
+    broadcast_data="$(echo "${raw_html}" \
+      | sed -n 's/.*meta id=\"broadcast-data\" content=\"\(.*\)"><meta id=\"broadcast-in-app\".*/\1/p' \
+      | sed -e 's/\&quot;/"/g' \
+            -e 's/\&amp;/\&/g' )"
+
+    # check if the channel is broadcasting
+    local is_running
+    is_running="$(echo ${broadcast_data} \
+      | jq 'select(.broadcast.state=="RUNNING")' 2>/dev/null)"
+    if [[ -n "${is_running}" ]]; then
+      new_online_json="$(echo "${broadcast_data}" \
+        | jq "${new_online_json}"' +
+        [
+          .broadcast |
+          {
+            service: "Periscope",
+            service_logo: "https://www.periscope.tv/v/images/press_assets/largeicon.png",
+            name: .username,
+            display_name: .user_display_name,
+            game: .class_name,
+            status: .status,
+            url: ("https://www.periscope.tv/" + .username),
+            logo: .profile_image_url
+          }
+        ]')"
+    fi
+  done
+
+  # notify for new streams
+  for channel in ${PERISCOPE_FOLLOWLIST}; do
     notifier_gateway "${new_online_json}" ${channel}
   done
 
