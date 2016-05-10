@@ -121,6 +121,12 @@ AZUBU_FOLLOWLIST=""
 # default: PERISCOPE_FOLLOWLIST=""
 PERISCOPE_FOLLOWLIST=
 
+### YOUTUBE SETTINGS
+# YOUTUBE_KEY - (Required) Youtube API key with "YouTube Data API v3" enabled.
+# YOUTUBE_FOLLOWLIST - List of youtube users whose channels's to check on, devices by spaces.
+YOUTUBE_KEY=""
+YOUTUBE_FOLLOWLIST=""
+
 
 ### NOTIFIER SETTINGS
 # Settings for the user-visable notifications for changes to a stream status.
@@ -257,6 +263,7 @@ services_gateway() { # call each service plugin, collect their data for database
   service::hitbox
   service::azubu
   service::periscope
+  service::youtube
   # send the updated data to the database
   db_commit "${new_online_db}"
 }
@@ -599,6 +606,64 @@ service::periscope() { # https://www.periscope.tv/
 
   # notify for new streams
   for channel in ${PERISCOPE_FOLLOWLIST}; do
+    notifier_gateway "${new_online_json}" ${channel}
+  done
+
+  db_add "${new_online_json}"
+}
+service::youtube() { # https://www.youtube.com/
+  if [[ -z "${YOUTUBE_KEY}" ]]; then
+    error "You need to set YOUTUBE_KEY in your settings file."
+    return 1
+  fi
+  if [[ -z "${YOUTUBE_FOLLOWLIST}" ]]; then
+    return 0 # nothing to check
+  fi
+
+  # remove duplicates from the list
+  YOUTUBE_FOLLOWLIST=$(echo $(printf '%s\n' ${YOUTUBE_FOLLOWLIST} | sort -u))
+
+  # define some api url strings
+  local yt_api="https://www.googleapis.com/youtube/v3/"
+  local yt_user_search="${yt_api}channels?part=snippet&key=${YOUTUBE_KEY}&forUsername="
+  local yt_live_search="${yt_api}search?part=snippet&eventType=live&type=video&key=${YOUTUBE_KEY}&channelId="
+
+  local new_online_json='[]'
+  for channel in ${YOUTUBE_FOLLOWLIST}; do
+    # get the channel id for a youtube user
+    local user_data="$(curl -s -X GET ${yt_user_search}${channel})"
+    local chan_id
+    chan_id="$(echo "${user_data}" | jq -r '.items[0].id')"
+
+    local broadcast_data
+    broadcast_data="$(curl -s -X GET ${yt_live_search}${chan_id})"
+
+    # check if the channel is broadcasting
+    local broadcast_status
+    broadcast_status="$(echo ${broadcast_data} \
+      | jq -r '.items[0].snippet.liveBroadcastContent' 2>/dev/null)"
+    if [[ "${broadcast_status}" == "live" ]]; then
+      local chan_logo
+      chan_logo="$(echo "${user_data}" | jq -r '.items[0].snippet.thumbnails.high.url')"
+      new_online_json="$(echo "${broadcast_data}" \
+        | jq "${new_online_json}"' +
+        [
+          .items[0] |
+          {
+            service: "YouTube",
+            service_logo: "https://www.youtube.com/yt/brand/media/image/YouTube-icon-full_color.png",
+            name: "'"${channel}"'",
+            display_name: .snippet.channelTitle,
+            status: .snippet.title,
+            url: ("https://www.youtube.com/watch?v=" + .id.videoId),
+            logo: "'"${chan_logo}"'"
+          }
+        ]')"
+    fi
+  done
+
+  # notify for new streams
+  for channel in ${YOUTUBE_FOLLOWLIST}; do
     notifier_gateway "${new_online_json}" ${channel}
   done
 

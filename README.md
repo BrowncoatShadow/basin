@@ -12,6 +12,7 @@ on your machine or push them to a service like
 - [hitbox.tv](http://hitbox.tv)
 - [twitch.tv](http://twitch.tv)
 - [periscope.tv](https://periscope.tv)
+- [youtube.com](https://youtube.com)
 
 
 ### Notifier Plugins
