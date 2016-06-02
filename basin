@@ -181,7 +181,7 @@ json_get() { # get channel data from an array of channel objects
   echo "${1}" | jq -r '.[] | select(.name=="'${2}'") | .'${3}
 }
 chan_get() { # get a value from a channel object
-  echo "${1}" | jq -r .${2}
+  echo "${1}" | jq -r ".${2} | select(.!=null)"
 }
 db_get() { # get data from the database
   cat "${DBFILE}" \
