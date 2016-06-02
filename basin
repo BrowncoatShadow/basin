@@ -183,6 +183,11 @@ json_get() { # get channel data from an array of channel objects
 chan_get() { # get a value from a channel object
   echo "${1}" | jq -r ".${2} | select(.!=null)"
 }
+playing_check() { # return null if given game is null, return given "playing" string if it is not
+  if [[ -n "${1}" ]]; then
+    echo "${2}"
+  fi
+}
 db_get() { # get data from the database
   cat "${DBFILE}" \
     | jq -r '(.online // [])[] | select(.service=="'${1}'" and .name=="'${2}'") | .'${3}
@@ -273,36 +278,43 @@ services_gateway() { # call each service plugin, collect their data for database
 # channel changes its status. notifier_gateway() calls a notifier plugin with a
 # channel JSON object as the only argument. A notifier can pull that
 # information it wants out of the that object.
+# Notifier plugins should follow formatting guidelines: https://git.io/vrh4p
 notifier::echo() { # notify by printing to STDOUT in the terminal
-  local service display_name game status url
+  local service display_name game status url playing
   service="$(chan_get "${1}" 'service')"
   display_name="$(chan_get "${1}" 'display_name')"
-  game="$(chan_get "${1}" 'game')"
   status="$(chan_get "${1}" 'status')"
   url="$(chan_get "${1}" 'url')"
-  echo "${service} | ${display_name} [${game}]: ${status} <${url}>"
+  game="$(chan_get "${1}" 'game')"
+  playing="$(playing_check "${game}" " playing ${game}")"
+
+  echo "${service} | ${display_name}${playing} | ${status} | ${url}"
 }
 notifier::kdialog() { # notify by KDialog popup
   local service display_name game status
   service="$(chan_get "${1}" 'service')"
   display_name="$(chan_get "${1}" 'display_name')"
-  game="$(chan_get "${1}" 'game')"
   status="$(chan_get "${1}" 'status')"
+  game="$(chan_get "${1}" 'game')"
+  playing="$(playing_check "${game}" " playing <b>${game}</b>")"
+
   kdialog \
-    --title "${display_name} is now live on ${service}" \
+    --title "${service}" \
     --icon "video-player" \
-    --passivepopup "<b>${game}</b><br>${status}"
+    --passivepopup "<b>${display_name}</b>${playing}<br>${status}"
 }
 notifier::osx() { # OS X Notification Center with applescript
   local service display_name game status
   service="$(chan_get "${1}" 'service')"
   display_name="$(chan_get "${1}" 'display_name')"
-  game="$(chan_get "${1}" 'game')"
   status="$(chan_get "${1}" 'status')"
+  game="$(chan_get "${1}" 'game')"
+  playing="$(playing_check "${game}" " playing ${game}")"
+
   osascript \
     -e "display notification \"${status}\" \
     with title \"${service}\" \
-    subtitle \"${display_name} is playing ${game}\""
+    subtitle \"${display_name}${playing}\""
 }
 notifier::terminal_notifier() { # OS X Notification Center with terminal-notifier
   local service display_name game status url
@@ -310,16 +322,19 @@ notifier::terminal_notifier() { # OS X Notification Center with terminal-notifie
   service_logo="$(chan_get "${1}" 'service_logo')"
   logo="$(chan_get "${1}" 'logo')"
   display_name="$(chan_get "${1}" 'display_name')"
-  game="$(chan_get "${1}" 'game')"
   status="$(chan_get "${1}" 'status')"
   url="$(chan_get "${1}" 'url')"
+  game="$(chan_get "${1}" 'game')"
+  playing="$(playing_check "${game}" " playing ${game}")"
+
   tn_sanitize() { # escape characters known to cause issues at the beginning of strings
     local escape='[<'
     echo "${1}" | sed "s/^[${escape}]/\\\&/"
   }
+
   terminal-notifier \
     -title "${service}" \
-    -subtitle "${display_name} is playing ${game}" \
+    -subtitle "${display_name}${playing}" \
     -message "$(tn_sanitize "${status}")" \
     -appIcon "${service_logo}" \
     -contentImage "${logo}" \
@@ -335,9 +350,10 @@ notifier::pushbullet() { # notify by PushBullet API notification
   local service display_name game status url
   service="$(chan_get "${1}" 'service')"
   display_name="$(chan_get "${1}" 'display_name')"
-  game="$(chan_get "${1}" 'game')"
   status="$(chan_get "${1}" 'status')"
   url="$(chan_get "${1}" 'url')"
+  game="$(chan_get "${1}" 'game')"
+  playing="$(playing_check "${game}" " playing ${game}")"
 
   # function to send pushes
   push() {
@@ -345,8 +361,8 @@ notifier::pushbullet() { # notify by PushBullet API notification
     data='{
       "device_iden": "'"${1}"'",
       "type": "link",
-      "title": "'"${display_name} on ${service}"'",
-      "body": "'"[${game}] \\n${status}"'",
+      "title": "'"${service}"'",
+      "body": "'"${display_name}${playing}\\n${status}"'",
       "url": "'"${url}"'"
     }'
     curl -s \
