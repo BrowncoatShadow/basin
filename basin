@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # basin - all the streams you care about in once place
 # by BrowncoatShadow and Crendgrim
-# <https://github.com/BrowncoatShadow/basin>
+# https://github.com/BrowncoatShadow/basin
 
 ### Helper Functions
 check_system() { # platform specific fixes and function definitions
@@ -37,7 +37,7 @@ load_config() { # load configuration from file # check if alternative config fil
     if [[ ! -f "${ALT_CONFIG}" ]]; then
       error "The specified configuration file ${ALT_CONFIG} is missing."
       error "You can create it by copying the default configuration file at \`${HOME}/.config/basinrc\`."
-      error "If that file does not exist, you can create it by calling \`basin -C\`."
+      error "If that file does not exist, you can create it by running: basin init"
       exit 1
     fi
 
@@ -47,7 +47,7 @@ load_config() { # load configuration from file # check if alternative config fil
     # if the config file does not exist yet, exit with a descriptive error message
     if [[ ! -f "${HOME}/.config/basinrc" ]]; then
       error "The default configuration file ${HOME}/.config/basinrc is missing."
-      error "You can create it by calling \`basin -C\`."
+      error "You can create it by running: basin init"
       exit 1
     fi
 
@@ -147,7 +147,7 @@ CONFIG
 }
 init_cron() { # create cronjob
   # check if entry already exists in crontab, skip this step if it does
-  if crontab -l 2> /dev/null | grep -Fq 'basin'; then
+  if crontab -l 2> /dev/null | grep -Fq 'basin check'; then
     return
   fi
 
@@ -165,7 +165,7 @@ init_cron() { # create cronjob
   # `parse error: Invalid numeric literal at line 1, column 20`
   # list crontab, concat that output with basin's cron job, feed back to crontab
   crontab -l 2> /dev/null \
-    | { cat; echo "*/1 * * * * ${source_dir}/basin"; } \
+    | { cat; echo "*/1 * * * * ${source_dir}/basin check"; } \
     | crontab -
 }
 check_file() { # generate given folders and files if they do not exist
@@ -221,61 +221,21 @@ db_recover() { # recover an existing DB entry for broken API results
     echo "${json}"
   fi
 }
-notifier_gateway() { # determine if a channel merits notification, call notifier plugins
-  local new_online_json="${1}" # JSON object parsed by service plugin
-  local channel="${2}" # channel to check against service and db
-
-  # check if stream is active
-  local name
-  name="$(json_get "${new_online_json}" "${channel}" 'name')"
-  if [[ "${name}" == "${channel}" ]]; then
-    # notify unless something says not to
-    local notify=true
-
-    # check if it has been active since last check
-    if [[ -n "${DBFILE}" ]]; then
-      local service dbcheck
-      service="$(json_get "${new_online_json}" "${channel}" 'service')"
-      dbcheck="$(db_get ${service} ${name} 'name')"
-
-      # already streaming last time, check for updates
-      if [[ -n "${dbcheck}" ]]; then
-        notify=false
-        local dbgame dbstatus sgame sstatus
-        dbgame="$(db_get ${service} ${name} 'game')"
-        dbstatus="$(db_get ${service} ${name} 'status')"
-        sgame="$(json_get "${new_online_json}" "${channel}" 'game')"
-        sstatus="$(json_get "${new_online_json}" "${channel}" 'status')"
-        # notify when game or status change
-        if [[ "${dbgame}" != "${sgame}" || "${dbstatus}" != "${sstatus}" ]]; then
-          notify=true
-        fi
-      fi
-    fi
-
-    if [[ ${notify} == true ]]; then
-      # send notification by using the module and giving it the arguments
-      local notifier="notifier::${NOTIFIER}"
-      ${notifier} "$(json_get "${new_online_json}" "${channel}")"
-    fi
-  fi
+db_health() { # makes sure the DB file exists and is not too old
+  check_file "${DBFILE}" "{}"
+  # cleanup: if the database file is older than 2 hours, consider it outdated
+  # and remove its contents
+  [[ -s "${DBFILE}" && $(($(date +%s)-$(cat "${DBFILE}" | jq -r '.lastcheck // 0'))) -gt 7200 ]] && echo "{}" > "${DBFILE}"
 }
-services_gateway() { # call each service plugin, collect their data for database
-  # initialize global that will be updated by each service function
-  new_online_db='[]'
-  # call the plugin for each service
-  service::twitch
-  service::hitbox
-  service::azubu
-  service::periscope
-  service::youtube
-  # send the updated data to the database
-  db_commit "${new_online_db}"
+preflight() { # handles all common tasks that should be taken before normal operations
+  check_system
+  load_config
+  db_health
 }
 
 ### Notifier Plugins
 # Plugins to used to create some form of user-visible notification when a
-# channel changes its status. notifier_gateway() calls a notifier plugin with a
+# channel changes its status. basin::notify() calls a notifier plugin with a
 # channel JSON object as the only argument. A notifier can pull that
 # information it wants out of the that object.
 # Notifier plugins should follow formatting guidelines: https://git.io/vrh4p
@@ -384,18 +344,18 @@ notifier::pushbullet() { # notify by PushBullet API notification
 }
 
 ### Service Plugins
-# Plugins for specific streaming services. Each plugin is called by services_gateway()
+# Plugins for specific streaming services. Each plugin is called by basin::check()
 # whenever the local database needs to be updated. They are responsible for
 # fetching data from their foreign APIs, parsing this data, then performing
 # two main functions with that data:
-#   - Call notifier_gateway() for each channel in its watch list, which will
+#   - Call basin::notify() for each channel in its watch list, which will
 #   determine against the plugin's parsed data if the channel is online and take
 #   the proper notification actions.
 #   - At the end of the function, call db_add() with the JSON array of online
 #   channel objects to be sent to the database.
 # Ideally, all service specific logic (config value checks, service related
 # naming, etc) should be contained within the service function. That way, adding
-# a new service plugin only consists of adding a function call to services_gateway().
+# a new service plugin only consists of adding a function call to basin::check().
 service::twitch() { # https://www.twitch.tv/
   if [[ -z "${TWITCH_USER}" && -z "${TWITCH_FOLLOWLIST}" ]]; then
     return 0 # nothing to check
@@ -463,7 +423,7 @@ service::twitch() { # https://www.twitch.tv/
     fi
 
     # if result is not broken, send it to notifier gateway
-    notifier_gateway "${new_online_json}" "${channel}"
+    basin::notify "${new_online_json}" "${channel}"
   done
 
   db_add "${new_online_json}"
@@ -527,7 +487,7 @@ service::hitbox() { # http://www.hitbox.tv/
 
   # notify for new streams
   for channel in ${hitbox_list}; do
-    notifier_gateway "${new_online_json}" ${channel,,}
+    basin::notify "${new_online_json}" ${channel,,}
   done
 
   db_add "${new_online_json}"
@@ -568,7 +528,7 @@ service::azubu() { # http://www.azubu.tv/
 
   # notify for new streams
   for channel in ${azubu_list}; do
-    notifier_gateway "${new_online_json}" ${channel}
+    basin::notify "${new_online_json}" ${channel}
   done
 
   db_add "${new_online_json}"
@@ -622,7 +582,7 @@ service::periscope() { # https://www.periscope.tv/
 
   # notify for new streams
   for channel in ${PERISCOPE_FOLLOWLIST}; do
-    notifier_gateway "${new_online_json}" ${channel}
+    basin::notify "${new_online_json}" ${channel}
   done
 
   db_add "${new_online_json}"
@@ -680,73 +640,189 @@ service::youtube() { # https://www.youtube.com/
 
   # notify for new streams
   for channel in ${YOUTUBE_FOLLOWLIST}; do
-    notifier_gateway "${new_online_json}" ${channel}
+    basin::notify "${new_online_json}" ${channel}
   done
 
   db_add "${new_online_json}"
 }
 
-### Interactive Menu
-# This displays an interactive menu in the terminal that shows who the local
-# database says are currently online. This interactive mode does not actively
-# check for online streams, it simply shows the current state of the database in
-# a friendly way. A regular instance of the script needs to be run in a cron job
-# or similar to update the database. Thanks a lot to:
-# <https://stackoverflow.com/questions/27945567/bash-script-overwrite-output-without-filling-scrollback/27946484#27946484>.
-interactive_cleanup() { # exit interactive mode gracefully
-  # revert black magic, exit the screen and recover old cursor position
-  stty sane
-  # exit the screen and recover old cursor position at this point, all changes
-  # done by our script should be reverted
-  tput rmcup
-  # end the script here, don't query the API at all
+### Basin Core
+# These are the core services for basin.
+basin::help() { # be helpful
+  case "${1}" in
+    help) echo "You like to break things, don't you?" ;;
+    init)
+      cat <<INIT
+Useage:
+  basin init
+
+Description:
+  This initializes the environment that basin needs to properly run for most
+  use-cases. The steps it takes are as follows:
+  - Create a new configuration file at ~/.config/basinrc
+  - Open the file in the user's EDITOR, so that they can fill in important bits.
+  - Check and see if the default crontab entry exists, create it if it does not.
+INIT
+      ;;
+  check)
+      cat <<CHECK
+Useage:
+  basin check
+
+Description:
+  This is the bread and butter of basin. It checks all services to see if
+  channels you care about are online. It checks against a local database every
+  time a check is performed; if the channel started streaming since the last
+  check, or changes their game or status, then it triggers a notification.
+CHECK
+      ;;
+  tui)
+      cat <<TUI
+Useage:
+  basin tui
+
+Description:
+  This displays a text-based user interface in the terminal that shows who the
+  local database says are currently online. This does not actively check for
+  online streams, it simply shows the current state of the database in a
+  friendly way. A regular instance of the script (basin check) needs to be run
+  in a cron job or similar to keep the database fresh.
+TUI
+      ;;
+    *)
+      cat <<USEAGE
+Useage:
+  basin [options] command [subcommands]
+
+Options:
+  -c FILE         Use the specified config file instead of the default.
+
+Commands:
+  help <command>  Displays help and any subcommands for a given command.
+  init            Initialize new config file and crontab entry.
+  check           Checks all services for new online channels, saves them to the
+                  local database, and sends notifications about them.
+  tui             Starts a text user interface that displays the current online
+                  channels, according to the local database.
+USEAGE
+      ;;
+  esac
+}
+basin::init() { # initialize environment
+  init_config
+  init_cron
   exit 0
 }
-interactive_output() { # generate the output for the interactive menu
-  tput clear
+basin::check() { # call each service plugin, collect their data for database
+  preflight
+  new_online_db='[]'
 
-  local last_checked
-  last_checked=$(cat ${DBFILE} | jq -r '.lastcheck // 0')
-  if [[ ${last_checked} -eq 0 ]]; then
-    echo "Database too old, updating..."
-    services_gateway
-    last_checked=$(cat "${DBFILE}" | jq -r '.lastcheck')
-  fi
+  service::twitch
+  service::hitbox
+  service::azubu
+  service::periscope
+  service::youtube
 
-  # print the header
-  echo -n "Streams currently live: (last checked at "
-  system_date "${last_checked}"
-  echo "[press q to exit]"
-
-  # pretty-print the database json
-  echo -e "$(cat "${DBFILE}" | jq -r '
-    .online[] |
-      [
-        "\n\\033[1;34m", .display_name, "\\033[0m",
-        (
-          # Properly align the game for shorter channel names
-          .display_name | length |
-          if . < 8 then
-            "\t\t"
-          else
-            "\t"
-          end
-        ),
-        "\\033[0;36m", .game, "\\033[0m",
-        "\n\\033[0;32m", .url, "\\033[0m",
-        "\n", .status
-      ] |
-    add')"
-  echo
+  db_commit "${new_online_db}"
 }
-interactive_menu() { # creates interactive menu and handles input
+basin::notify() { # determine if a channel merits notification, call notifier plugins
+  local new_online_json="${1}" # JSON object parsed by service plugin
+  local channel="${2}" # channel to check against service and db
+
+  # check if stream is active
+  local name
+  name="$(json_get "${new_online_json}" "${channel}" 'name')"
+  if [[ "${name}" == "${channel}" ]]; then
+    # notify unless something says not to
+    local notify=true
+
+    # check if it has been active since last check
+    if [[ -n "${DBFILE}" ]]; then
+      local service dbcheck
+      service="$(json_get "${new_online_json}" "${channel}" 'service')"
+      dbcheck="$(db_get ${service} ${name} 'name')"
+
+      # already streaming last time, check for updates
+      if [[ -n "${dbcheck}" ]]; then
+        notify=false
+        local dbgame dbstatus sgame sstatus
+        dbgame="$(db_get ${service} ${name} 'game')"
+        dbstatus="$(db_get ${service} ${name} 'status')"
+        sgame="$(json_get "${new_online_json}" "${channel}" 'game')"
+        sstatus="$(json_get "${new_online_json}" "${channel}" 'status')"
+        # notify when game or status change
+        if [[ "${dbgame}" != "${sgame}" || "${dbstatus}" != "${sstatus}" ]]; then
+          notify=true
+        fi
+      fi
+    fi
+
+    if [[ ${notify} == true ]]; then
+      # send notification by using the module and giving it the arguments
+      local notifier="notifier::${NOTIFIER}"
+      ${notifier} "$(json_get "${new_online_json}" "${channel}")"
+    fi
+  fi
+}
+basin::tui() { # display DB items using a text-based user interface
+  # Thanks a lot to: http://stackoverflow.com/a/27946484
+
+  tui_cleanup() { # exit interactive mode gracefully
+    # revert black magic, exit the screen and recover old cursor position
+    stty sane
+    # exit the screen and recover old cursor position at this point, all changes
+    # done by our script should be reverted
+    tput rmcup
+    # end the script here, don't query the API at all
+    exit 0
+  }
+
+  tui_display() { # generate the output for the interactive menu
+    tput clear
+
+    db_health
+    local last_checked
+    last_checked=$(cat ${DBFILE} | jq -r '.lastcheck // 0')
+    if [[ ${last_checked} -eq 0 ]]; then
+      error "Database is stale. Try updating with: basin check"
+      exit 1
+    fi
+
+    # print the header
+    echo -n "Streams currently live: (last checked at "
+    system_date "${last_checked}"
+    echo "[press q to exit]"
+
+    # pretty-print the database json
+    echo -e "$(cat "${DBFILE}" | jq -r '
+      .online[] |
+        [
+          "\n\\033[1;34m", .display_name, "\\033[0m",
+          (
+            # Properly align the game for shorter channel names
+            .display_name | length |
+            if . < 8 then
+              "\t\t"
+            else
+              "\t"
+            end
+          ),
+          "\\033[0;36m", .game, "\\033[0m",
+          "\n\\033[0;32m", .url, "\\033[0m",
+          "\n", .status
+        ] |
+      add')"
+    echo
+  }
+
+  preflight
   # enables deletion of output, and sets the read timeout so we have immediate
   # reactions
   stty -icanon time 0 min 0
   # saves current position of the cursor, and opens new screen
   tput smcup
   # let's start by displaying our data
-  interactive_output
+  tui_display
 
   # We have to constantly run the loop to give a fast reaction should the user
   # want to quit, but we do not want to constantly update the output. Let's keep
@@ -763,7 +839,7 @@ interactive_menu() { # creates interactive menu and handles input
     ((i+=1))
     if [[ ${i} -eq 25 ]]; then
       # output our stuff
-      interactive_output
+      tui_display
       i=0
     fi
     # If a button is pressed, read it. Since we set the minimum read length to 0
@@ -772,59 +848,33 @@ interactive_menu() { # creates interactive menu and handles input
     read keypress
 
     # handle ctrl-c (SIGINT) gracefully and restore the proper prompt
-    trap interactive_cleanup SIGINT
+    trap tui_cleanup SIGINT
   done
 
   # reset and exit
-  interactive_cleanup
+  tui_cleanup
 }
 
 ### Main Function
 main() {
-  # check for dependencies
   depends_on jq
   depends_on curl
 
-  # TODO rebuild option system, additional options for debug, help, lists
-  # check for options
-  while getopts ":c:Ci" opt; do
+  while getopts ":c:" opt; do
     case ${opt} in
-      c) # use config passed as an argument
-        ALT_CONFIG="${OPTARG}"
-        ;;
-      C) # generate the config and setup the cronjob, exit after
-        init_config
-        init_cron
-        exit 0
-        ;;
-      i) # start interactive mode
-        local interactive=true
-        ;;
-      \?) # unknown option
-        error "Invalid option: -${OPTARG}"
-        exit 1
-        ;;
+      c) ALT_CONFIG="${OPTARG}" ;;
+      \?) error "Invalid option: -${OPTARG}"; exit 1 ;;
+      :) error "-${OPTARG} requires an argument."; exit 1 ;;
     esac
   done
+  shift $((OPTIND-1))
 
-  # bootstrap
-  check_system
-  load_config
-  check_file "${DBFILE}" "{}"
-  if [[ "${debug}" == "true" ]]; then
-    check_file "${DEBUGFILE}" "[]"
-  fi
-
-  # TODO this should probably be broken apart and put in it's own function
-  # cleanup: if the database file is older than 2 hours, consider it outdated
-  # and remove its contents
-  [[ -s "${DBFILE}" && $(($(date +%s)-$(cat "${DBFILE}" | jq -r '.lastcheck // 0'))) -gt 7200 ]] && echo "{}" > "${DBFILE}"
-
-  # check if we are supposed to be running in interactive mode
-  if [[ "${interactive}" == "true" ]]; then
-    interactive_menu
-  else # non-interactive, act normal
-    services_gateway
-  fi
+  case ${1} in
+    init) basin::init ;;
+    check) basin::check ;;
+    tui) basin::tui ;;
+    help) shift; basin::help "${@}" ;;
+    *) basin::help ;;
+  esac
 }
 main "$@"
