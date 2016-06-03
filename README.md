@@ -32,29 +32,17 @@ on your machine or push them to a service like
 ```bash
 git clone https://github.com/BrowncoatShadow/basin.git
 cd basin
-./basin -C
+./basin init
+./basin start
 ```
-This will generate `~/.config/basinrc`, which will then open for you to edit.
-It will then ask if you want it to setup a crontab entry. This crontab entry
-will run every minute by default. You can change the frequency by editing your
-crontab. The default crontab entry looks something like this:
-```
-*/1 * * * * ~/basin/basin
-```
+`basin init` will generate `~/.config/basinrc`, which will then open for you to
+edit. You can add service and notification specific settings here.
 
+`basin start` will add a crontab entry that will run `basin check` every minute
+to check your configured services and send notifications.
 
-## Command Line Options
-- `-c <rcfile>`
-  - Use alt config file. This will cause the script not to check for, create, or
-    use the default config. Instead it will use the config file given as an
-    argument.
-- `-C`
-  - Create a new config file. This generates `~/.config/basinrc` and then opens
-    it in EDITOR for the user to give initial settings.
-- `-i`
-  - Interactive, updating list that shows which streams are live. It uses the
-    offline database, so the script needs to be periodically running in the
-    background (for example, via crontab) for updates to show.
+Run basin without any arguments to get a more in-depth usage description and
+learn how to use it's built-in help command.
 
 
 ## Contributing

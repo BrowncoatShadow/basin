@@ -145,29 +145,6 @@ CONFIG
   # open the new basinrc with the users ${EDITOR}, so they can configure it
   ${EDITOR} "${HOME}/.config/basinrc"
 }
-init_cron() { # create cronjob
-  # check if entry already exists in crontab, skip this step if it does
-  if crontab -l 2> /dev/null | grep -Fq 'basin check'; then
-    return
-  fi
-
-  local prompt_string="Would you like basin to add itself to your crontab? (This runs the script every minute.) [y/N] "
-  read -p "${prompt_string}"
-  if [[ ! "${REPLY}" =~ ^[yY].* ]]; then
-    echo "Aborting crontab entry creation..."
-    return 0
-  fi
-
-  local source_dir
-  source_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-  # FIXME Parse error being sent to mail by cron. Presumed to be caused by
-  # characters in channel status returned by service APIs.
-  # `parse error: Invalid numeric literal at line 1, column 20`
-  # list crontab, concat that output with basin's cron job, feed back to crontab
-  crontab -l 2> /dev/null \
-    | { cat; echo "*/1 * * * * ${source_dir}/basin check"; } \
-    | crontab -
-}
 check_file() { # generate given folders and files if they do not exist
   if [[ ! -f ${1} ]]; then
     mkdir -p $(dirname ${1})
@@ -194,7 +171,59 @@ preflight() { # handles all common tasks that should be taken before normal oper
   database::health
 }
 
+### Crontab
+# Functions that manage basin's crontab entry.
+crontab::running() { # check if entry already exists in crontab
+  depends_on crontab
+
+  # this can be fooled by basin's entry being commented out
+  if crontab -l 2> /dev/null | grep -Fq 'basin check'; then
+    true
+  else
+    false
+  fi
+}
+crontab::status() { # prints basin's status to terminal
+  if crontab::running; then
+    echo "Basin is running."
+  else
+    echo "Basin is not running."
+  fi
+}
+crontab::start() { # create basin's crontab entry
+  if crontab::running; then
+    error "Basin is already running."
+    exit 1
+  fi
+  # if given an argument, use it as the number of minutes between checks
+  local minutes
+  if [[ "${1}" ]]; then
+    if [[ ! "${1}" =~ ^[0-9]+$ || "${1}" -lt 1  ]]; then
+      error "Minutes for 'start' need to be a number, greater than 1."
+    else
+      minutes="${1}"
+    fi
+  else
+    minutes=1
+  fi
+  local source_dir
+  source_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+  local entry="*/${minutes} * * * * ${source_dir}/basin check >/dev/null 2>&1"
+
+  # list crontab, concat that output with basin's entry, feed back to crontab
+  crontab -l 2> /dev/null | { cat; echo "${entry}"; } | crontab -
+}
+crontab::stop() { # remove basin's crontab entry
+  if ! crontab::running; then
+    return
+  fi
+
+  # list crontab, remove basin's entry, feed back to crontab
+  crontab -l 2> /dev/null | sed '/basin check/d' | crontab -
+}
+
 ### Database
+# Functions that handle the local database.
 database::get() { # get data from the database
   cat "${DBFILE}" \
     | jq -r '(.online // [])[] | select(.service=="'${1}'" and .name=="'${2}'") | .'${3}
@@ -640,21 +669,29 @@ service::youtube() { # https://www.youtube.com/
 # The core functionality for basin.
 basin::help() { # be helpful
   case "${1}" in
-    help) echo "You like to break things, don't you?" ;;
+    help)
+      cat <<HELP
+Useage:
+  basin help [command]
+
+Description:
+  Help will desscribe commands and how they can be used.
+
+See Also:
+  useage
+HELP
+      ;;
     init)
       cat <<INIT
 Useage:
   basin init
 
 Description:
-  This initializes the environment that basin needs to properly run for most
-  use-cases. The steps it takes are as follows:
-  - Create a new configuration file at ~/.config/basinrc
-  - Open the file in the user's EDITOR, so that they can fill in important bits.
-  - Check and see if the default crontab entry exists, create it if it does not.
+  Creates a new configuration file at ~/.config/basinrc, and opens it in the
+  user's EDITOR to be customized.
 INIT
       ;;
-  check)
+    check)
       cat <<CHECK
 Useage:
   basin check
@@ -666,7 +703,7 @@ Description:
   check, or changes their game or status, then it triggers a notification.
 CHECK
       ;;
-  tui)
+    tui)
       cat <<TUI
 Useage:
   basin tui
@@ -679,7 +716,7 @@ Description:
   in a cron job or similar to keep the database fresh.
 TUI
       ;;
-  reset)
+    reset)
       cat <<RESET
 Useage:
   basin reset
@@ -689,7 +726,48 @@ Description:
   notifications for all online channels on the next check or when developing.
 RESET
       ;;
-    *)
+    start)
+      cat <<START
+Useage:
+  basin start [minutes]
+
+Description:
+  Adds a crontab entry for basin that runs every minute. You can change the
+  default number of minutes by giving start an argument that is a number greater
+  than 1. Most service APIs discourage checking more often than once a minute.
+
+See Also:
+  stop, status
+START
+      ;;
+    stop)
+      cat <<STOP
+Useage:
+  basin stop
+
+Description:
+  Removes basin's crontab entry; thus making sure it is no longer running.
+
+See Also:
+  start, status
+STOP
+      ;;
+    status)
+      cat <<STATUS
+Useage:
+  basin status
+
+Description:
+  Checks to see if there is an entry for basin in crontab. This can be fooled
+  into thinking basin is running by having a crontab entry for basin that is
+  commented out. A simple fix for this is to run basin's stop and start commands
+  to remove the entry and re-add it.
+
+See Also:
+  start, stop
+STATUS
+      ;;
+    useage)
       cat <<USEAGE
 Useage:
   basin [options] command [subcommands]
@@ -698,20 +776,15 @@ Options:
   -c FILE         Use the specified config file instead of the default.
 
 Commands:
-  help <command>  Displays help and any subcommands for a given command.
-  init            Initialize new config file and crontab entry.
-  check           Checks all services for new online channels, saves them to the
-                  local database, and sends notifications about them.
-  tui             Starts a text user interface that displays the current online
-                  channels, according to the local database.
-  reset           Resets the local database to empty.
+  help, useage, check, tui, reset, start, stop, status
 USEAGE
       ;;
+    *) echo "No help entry for: ${1}" ;;
   esac
 }
 basin::init() { # initialize environment
   init_config
-  init_cron
+  crontab::start
   exit 0
 }
 basin::check() { # call each service plugin, collect their data for database
@@ -875,8 +948,11 @@ main() {
     check) basin::check ;;
     tui) basin::tui ;;
     reset) load_config && database::reset ;;
+    start) shift; crontab::start "${@}" ;;
+    stop) crontab::stop ;;
+    status) crontab::status ;;
     help) shift; basin::help "${@}" ;;
-    *) basin::help ;;
+    *) basin::help useage ;;
   esac
 }
-main "$@"
+main "${@}"
