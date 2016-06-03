@@ -234,11 +234,7 @@ preflight() { # handles all common tasks that should be taken before normal oper
 }
 
 ### Notifier Plugins
-# Plugins to used to create some form of user-visible notification when a
-# channel changes its status. basin::notify() calls a notifier plugin with a
-# channel JSON object as the only argument. A notifier can pull that
-# information it wants out of the that object.
-# Notifier plugins should follow formatting guidelines: https://git.io/vrh4p
+# Plugins that provide user-visible notifications.
 notifier::echo() { # notify by printing to STDOUT in the terminal
   local service display_name game status url playing
   service="$(chan_get "${1}" 'service')"
@@ -344,18 +340,7 @@ notifier::pushbullet() { # notify by PushBullet API notification
 }
 
 ### Service Plugins
-# Plugins for specific streaming services. Each plugin is called by basin::check()
-# whenever the local database needs to be updated. They are responsible for
-# fetching data from their foreign APIs, parsing this data, then performing
-# two main functions with that data:
-#   - Call basin::notify() for each channel in its watch list, which will
-#   determine against the plugin's parsed data if the channel is online and take
-#   the proper notification actions.
-#   - At the end of the function, call db_add() with the JSON array of online
-#   channel objects to be sent to the database.
-# Ideally, all service specific logic (config value checks, service related
-# naming, etc) should be contained within the service function. That way, adding
-# a new service plugin only consists of adding a function call to basin::check().
+# Plugins that provide support for a particular streaming service.
 service::twitch() { # https://www.twitch.tv/
   if [[ -z "${TWITCH_USER}" && -z "${TWITCH_FOLLOWLIST}" ]]; then
     return 0 # nothing to check
@@ -647,7 +632,7 @@ service::youtube() { # https://www.youtube.com/
 }
 
 ### Basin Core
-# These are the core services for basin.
+# The core functionality for basin.
 basin::help() { # be helpful
   case "${1}" in
     help) echo "You like to break things, don't you?" ;;
