@@ -934,9 +934,10 @@ main() {
   depends_on jq
   depends_on curl
 
-  while getopts ":c:" opt; do
+  while getopts ":c:h" opt; do
     case ${opt} in
       c) ALT_CONFIG="${OPTARG}" ;;
+      h) basin::help useage; exit 0 ;;
       \?) error "Invalid option: -${OPTARG}"; exit 1 ;;
       :) error "-${OPTARG} requires an argument."; exit 1 ;;
     esac
@@ -952,7 +953,7 @@ main() {
     stop) crontab::stop ;;
     status) crontab::status ;;
     help) shift; basin::help "${@}" ;;
-    *) basin::help useage ;;
+    *|useage) basin::help useage ;;
   esac
 }
 main "${@}"
