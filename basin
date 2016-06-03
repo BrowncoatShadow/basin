@@ -232,7 +232,10 @@ database::health() { # makes sure the DB file exists and is not too old
   check_file "${DBFILE}" "{}"
   # cleanup: if the database file is older than 2 hours, consider it outdated
   # and remove its contents
-  [[ -s "${DBFILE}" && $(($(date +%s)-$(cat "${DBFILE}" | jq -r '.lastcheck // 0'))) -gt 7200 ]] && echo "{}" > "${DBFILE}"
+  [[ -s "${DBFILE}" && $(($(date +%s)-$(cat "${DBFILE}" | jq -r '.lastcheck // 0'))) -gt 7200 ]] && database::reset
+}
+database::reset() { # wipes the database clean
+  echo "{}" > "${DBFILE}"
 }
 
 ### Notifier Plugins
@@ -676,6 +679,16 @@ Description:
   in a cron job or similar to keep the database fresh.
 TUI
       ;;
+  reset)
+      cat <<RESET
+Useage:
+  basin reset
+
+Description:
+  Resets the local database to empty. This is useful if you want to retrigger
+  notifications for all online channels on the next check or when developing.
+RESET
+      ;;
     *)
       cat <<USEAGE
 Useage:
@@ -691,6 +704,7 @@ Commands:
                   local database, and sends notifications about them.
   tui             Starts a text user interface that displays the current online
                   channels, according to the local database.
+  reset           Resets the local database to empty.
 USEAGE
       ;;
   esac
@@ -860,6 +874,7 @@ main() {
     init) basin::init ;;
     check) basin::check ;;
     tui) basin::tui ;;
+    reset) load_config && database::reset ;;
     help) shift; basin::help "${@}" ;;
     *) basin::help ;;
   esac
