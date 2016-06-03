@@ -188,29 +188,36 @@ playing_check() { # return null if given game is null, return given "playing" st
     echo "${2}"
   fi
 }
-db_get() { # get data from the database
+preflight() { # handles all common tasks that should be taken before normal operations
+  check_system
+  load_config
+  database::health
+}
+
+### Database
+database::get() { # get data from the database
   cat "${DBFILE}" \
     | jq -r '(.online // [])[] | select(.service=="'${1}'" and .name=="'${2}'") | .'${3}
 }
-db_add() { # add arrayed online channel objects to global list to be added to db
+database::include() { # add arrayed online channel objects to global list to be added to db
   # update the global with entries if they exist
   if [[ -n "${1}" ]]; then
     new_online_db="$(echo "${new_online_db}" | jq ". + ${1}")"
   fi
 }
-db_commit() { # save given json object to the DBFILE
+database::write() { # save given json object to the DBFILE
   if [[ -n "${DBFILE}" ]]; then
     echo "${1}" \
       | jq '{online: ., lastcheck: '$(date +%s)'}' > ${DBFILE}
   fi
 }
-db_recover() { # recover an existing DB entry for broken API results
+database::recover() { # recover an existing DB entry for broken API results
   local service="${1}"
   local json="${2}"
   local channel="${3}"
   # recover existing db entry if it exists
   local recovered_data
-  recovered_data="$(db_get "${service}" ${channel})"
+  recovered_data="$(database::get "${service}" ${channel})"
   if [[ -n "${recovered_data}" ]]; then
     # remove entry
     json="$(echo "${json}" \
@@ -221,16 +228,11 @@ db_recover() { # recover an existing DB entry for broken API results
     echo "${json}"
   fi
 }
-db_health() { # makes sure the DB file exists and is not too old
+database::health() { # makes sure the DB file exists and is not too old
   check_file "${DBFILE}" "{}"
   # cleanup: if the database file is older than 2 hours, consider it outdated
   # and remove its contents
   [[ -s "${DBFILE}" && $(($(date +%s)-$(cat "${DBFILE}" | jq -r '.lastcheck // 0'))) -gt 7200 ]] && echo "{}" > "${DBFILE}"
-}
-preflight() { # handles all common tasks that should be taken before normal operations
-  check_system
-  load_config
-  db_health
 }
 
 ### Notifier Plugins
@@ -401,7 +403,7 @@ service::twitch() { # https://www.twitch.tv/
       # don't re-notify
       if [[ -n "${DBFILE}" ]]; then
         # recover existing db entry if it exists
-        new_online_json="$(db_recover "${service}" "${new_online_json}" "${channel}")"
+        new_online_json="$(database::recover "${service}" "${new_online_json}" "${channel}")"
       fi
       # otherwise ignore the broken result to not get a null/null notification
       continue
@@ -411,7 +413,7 @@ service::twitch() { # https://www.twitch.tv/
     basin::notify "${new_online_json}" "${channel}"
   done
 
-  db_add "${new_online_json}"
+  database::include "${new_online_json}"
 }
 service::hitbox() { # http://www.hitbox.tv/
   if [[ -z "${HITBOX_USER}" && -z "${HITBOX_FOLLOWLIST}" ]]; then
@@ -447,7 +449,7 @@ service::hitbox() { # http://www.hitbox.tv/
       # insert entry recovered from database
       if [[ -n "${DBFILE}" ]]; then
         # recover existing db entry if it exists
-        new_online_json="$(db_recover "${service}" "${new_online_json}" "${channel}")"
+        new_online_json="$(database::recover "${service}" "${new_online_json}" "${channel}")"
       fi
 
     elif [[ "${is_live}" == "1" ]]; then
@@ -475,7 +477,7 @@ service::hitbox() { # http://www.hitbox.tv/
     basin::notify "${new_online_json}" ${channel,,}
   done
 
-  db_add "${new_online_json}"
+  database::include "${new_online_json}"
 }
 service::azubu() { # http://www.azubu.tv/
   if [[ -z "${AZUBU_FOLLOWLIST}" ]]; then
@@ -516,7 +518,7 @@ service::azubu() { # http://www.azubu.tv/
     basin::notify "${new_online_json}" ${channel}
   done
 
-  db_add "${new_online_json}"
+  database::include "${new_online_json}"
 }
 service::periscope() { # https://www.periscope.tv/
   if [[ -z "${PERISCOPE_FOLLOWLIST}" ]]; then
@@ -570,7 +572,7 @@ service::periscope() { # https://www.periscope.tv/
     basin::notify "${new_online_json}" ${channel}
   done
 
-  db_add "${new_online_json}"
+  database::include "${new_online_json}"
 }
 service::youtube() { # https://www.youtube.com/
   if [[ -z "${YOUTUBE_KEY}" ]]; then
@@ -628,7 +630,7 @@ service::youtube() { # https://www.youtube.com/
     basin::notify "${new_online_json}" ${channel}
   done
 
-  db_add "${new_online_json}"
+  database::include "${new_online_json}"
 }
 
 ### Basin Core
@@ -708,7 +710,7 @@ basin::check() { # call each service plugin, collect their data for database
   service::periscope
   service::youtube
 
-  db_commit "${new_online_db}"
+  database::write "${new_online_db}"
 }
 basin::notify() { # determine if a channel merits notification, call notifier plugins
   local new_online_json="${1}" # JSON object parsed by service plugin
@@ -725,14 +727,14 @@ basin::notify() { # determine if a channel merits notification, call notifier pl
     if [[ -n "${DBFILE}" ]]; then
       local service dbcheck
       service="$(json_get "${new_online_json}" "${channel}" 'service')"
-      dbcheck="$(db_get ${service} ${name} 'name')"
+      dbcheck="$(database::get ${service} ${name} 'name')"
 
       # already streaming last time, check for updates
       if [[ -n "${dbcheck}" ]]; then
         notify=false
         local dbgame dbstatus sgame sstatus
-        dbgame="$(db_get ${service} ${name} 'game')"
-        dbstatus="$(db_get ${service} ${name} 'status')"
+        dbgame="$(database::get ${service} ${name} 'game')"
+        dbstatus="$(database::get ${service} ${name} 'status')"
         sgame="$(json_get "${new_online_json}" "${channel}" 'game')"
         sstatus="$(json_get "${new_online_json}" "${channel}" 'status')"
         # notify when game or status change
@@ -765,7 +767,7 @@ basin::tui() { # display DB items using a text-based user interface
   tui_display() { # generate the output for the interactive menu
     tput clear
 
-    db_health
+    database::health
     local last_checked
     last_checked=$(cat ${DBFILE} | jq -r '.lastcheck // 0')
     if [[ ${last_checked} -eq 0 ]]; then
