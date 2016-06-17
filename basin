@@ -211,7 +211,7 @@ crontab::start() { # create basin's crontab entry
   local entry="*/${minutes} * * * * ${source_dir}/basin check >/dev/null 2>&1"
 
   # list crontab, concat that output with basin's entry, feed back to crontab
-  crontab -l 2> /dev/null | { cat; echo "${entry}"; } | crontab -
+  EDITOR=cat crontab -e 2> /dev/null | { cat; echo "${entry}"; } | crontab -
 }
 crontab::stop() { # remove basin's crontab entry
   if ! crontab::running; then
@@ -219,7 +219,7 @@ crontab::stop() { # remove basin's crontab entry
   fi
 
   # list crontab, remove basin's entry, feed back to crontab
-  crontab -l 2> /dev/null | sed '/basin check/d' | crontab -
+  EDITOR=cat crontab -e 2> /dev/null | sed '/basin check/d' | crontab -
 }
 
 ### Database
