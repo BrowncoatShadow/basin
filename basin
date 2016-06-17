@@ -607,12 +607,12 @@ service::periscope() { # https://www.periscope.tv/
   database::include "${new_online_json}"
 }
 service::youtube() { # https://www.youtube.com/
+  if [[ -z "${YOUTUBE_FOLLOWLIST}" ]]; then
+    return 0 # nothing to check
+  fi
   if [[ -z "${YOUTUBE_KEY}" ]]; then
     error "You need to set YOUTUBE_KEY in your settings file."
     return 1
-  fi
-  if [[ -z "${YOUTUBE_FOLLOWLIST}" ]]; then
-    return 0 # nothing to check
   fi
 
   # remove duplicates from the list
