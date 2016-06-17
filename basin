@@ -308,7 +308,9 @@ notifier::kdialog() { # notify by KDialog popup
   game="$(chan_get "${1}" 'game')"
   playing="$(playing_check "${game}" " playing <b>${game}</b>")"
 
-  kdialog \
+  display="$DISPLAY"
+  if [[ -z "$display" ]]; then display=":0"; fi
+  DISPLAY="$display" kdialog \
     --title "${service}" \
     --icon "video-player" \
     --passivepopup "<b>${display_name}</b>${playing}<br>${status}"
