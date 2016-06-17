@@ -757,11 +757,11 @@ Usage:
 Description:
   Allows to search for streams based on games or status. This will match any
   streams playing the list of games, or having the strings as their status.
-  The first 25 matching streams (ordered by viewer count) are displayed.
+  The first 10 matching streams (ordered by viewer count) are displayed.
 
 Note:
-  This will only search Twitch, since other services do not expose the
-  necessary search functionality.
+  This will only search Twitch and Hitbox, since other services do not expose
+  the necessary search functionality.
 SEARCH
       ;;
     reset)
@@ -873,33 +873,41 @@ basin::search() {
 
   shift
 
-  # Twitch
-
-  local returned_data
+  local returned_data_twitch
+  local returned_data_hitbox
 
   for arg
   do
     case ${type} in
       game)
-        returned_data="$(curl -s \
+        returned_data_twitch="$(curl -s \
           --header 'Client-ID: '${CLIENT} \
           -H 'Accept: application/vnd.twitchtv.v3+json' \
           --data-urlencode "game=${arg}" \
           -G "https://api.twitch.tv/kraken/streams?limit=10")"
+        returned_data_hitbox="$(curl -s \
+          --data-urlencode "game=${arg}" \
+          -G "https://api.hitbox.tv/media/live/list?limit=10")"
         ;;
       status)
-        returned_data="$(curl -s \
+        returned_data_twitch="$(curl -s \
           --header 'Client-ID: '${CLIENT} \
           -H 'Accept: application/vnd.twitchtv.v3+json' \
           --data-urlencode "query=\"${arg}\"" \
           -G "https://api.twitch.tv/kraken/search/streams?limit=10")"
+        returned_data_hitbox="$(curl -s \
+          --data-urlencode "search=${arg}" \
+          -G "https://api.hitbox.tv/media/live/list?limit=10")"
         ;;
       *)
         error '`basin search` can only search for `game` or `status`!'
         return 1
     esac
 
-    json="$(echo "$returned_data" | jq -r '[
+    local json_twitch
+    local json_hitbox
+    local json
+    json_twitch="$(echo "${returned_data_twitch}" | jq -r '[
       .streams[] |
       {
         service: "Twitch",
@@ -913,11 +921,28 @@ basin::search() {
         viewers: .viewers
       }
     ]')"
+    json_hitbox="$(echo "${returned_data_hitbox}" | jq -r '[
+      .livestream[] |
+      {
+        service: "Hitbox",
+        service_logo: "http://i.imgur.com/ogo74T5.png",
+        name: .media_name,
+        display_name: .media_display_name,
+        game: .category_name,
+        status: .media_status,
+        url: .channel.channel_link,
+        logo: ("http://edge.sf.hitbox.tv" + .channel.user_logo),
+        viewers: .media_views
+      }
+    ]')"
+
+    json="$(echo "${json_twitch}" | jq -r ". + ${json_hitbox}" | jq -r ". | sort_by(.viewers | tonumber) | reverse [:10]")"
+
     if [[ "$OUTPUT_JSON" == "true" ]]
     then
-      echo "$json" | jq '.'
+      echo "${json}" | jq '.'
     else
-      echo -e "$(echo "$json" | jq -r '.[] |
+      echo -e "$(echo "${json}" | jq -r '.[] |
         [
           "\n\\033[1;34m", .display_name, "\\033[0m",
           (
