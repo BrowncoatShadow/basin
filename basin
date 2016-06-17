@@ -266,6 +266,26 @@ database::health() { # makes sure the DB file exists and is not too old
 database::reset() { # wipes the database clean
   echo "{}" > "${DBFILE}"
 }
+database::print_formatted() { # pretty-prints the database
+  echo -e "$(cat "${DBFILE}" | jq -r '
+    .online[] |
+      [
+        "\n\\033[1;34m", .display_name, "\\033[0m",
+        (
+          # Properly align the game for shorter channel names
+          .display_name | length |
+          if . < 8 then
+            "\t\t"
+          else
+            "\t"
+          end
+        ),
+        "\\033[0;36m", .game, "\\033[0m",
+        "\n\\033[0;32m", .url, "\\033[0m",
+      "\n", .status
+      ] |
+    add')"
+}
 
 ### Notifier Plugins
 # Plugins that provide user-visible notifications.
@@ -703,6 +723,16 @@ Description:
   check, or changes their game or status, then it triggers a notification.
 CHECK
       ;;
+    list)
+      cat <<LIST
+Usage:
+  basin [-j] list
+
+Description:
+  This outputs a list of all live channels. If JSON output is active (-j),
+  it will output them as a JSON array.
+LIST
+      ;;
     tui)
       cat <<TUI
 Useage:
@@ -774,9 +804,10 @@ Useage:
 
 Options:
   -c FILE         Use the specified config file instead of the default.
+  -j              Use JSON instead of raw text output if applicable to the command.
 
 Commands:
-  help, useage, check, tui, reset, start, stop, status
+  help, useage, check, list, tui, reset, start, stop, status
 USEAGE
       ;;
     *) echo "No help entry for: ${1}" ;;
@@ -798,6 +829,19 @@ basin::check() { # call each service plugin, collect their data for database
   service::youtube
 
   database::write "${new_online_db}"
+}
+basin::list() { # list live channels
+  preflight
+  if [[ "$OUTPUT_JSON" == "true" ]]
+  then
+
+    cat "${DBFILE}" | jq '(.online // [])'
+
+  else
+
+    database::print_formatted
+
+  fi
 }
 basin::notify() { # determine if a channel merits notification, call notifier plugins
   local new_online_json="${1}" # JSON object parsed by service plugin
@@ -868,24 +912,7 @@ basin::tui() { # display DB items using a text-based user interface
     echo "[press q to exit]"
 
     # pretty-print the database json
-    echo -e "$(cat "${DBFILE}" | jq -r '
-      .online[] |
-        [
-          "\n\\033[1;34m", .display_name, "\\033[0m",
-          (
-            # Properly align the game for shorter channel names
-            .display_name | length |
-            if . < 8 then
-              "\t\t"
-            else
-              "\t"
-            end
-          ),
-          "\\033[0;36m", .game, "\\033[0m",
-          "\n\\033[0;32m", .url, "\\033[0m",
-          "\n", .status
-        ] |
-      add')"
+    database::print_formatted
     echo
   }
 
@@ -934,9 +961,10 @@ main() {
   depends_on jq
   depends_on curl
 
-  while getopts ":c:h" opt; do
+  while getopts ":c:jh" opt; do
     case ${opt} in
       c) ALT_CONFIG="${OPTARG}" ;;
+      j) OUTPUT_JSON="true" ;;
       h) basin::help useage; exit 0 ;;
       \?) error "Invalid option: -${OPTARG}"; exit 1 ;;
       :) error "-${OPTARG} requires an argument."; exit 1 ;;
@@ -947,6 +975,7 @@ main() {
   case ${1} in
     init) basin::init ;;
     check) basin::check ;;
+    list) basin::list ;;
     tui) basin::tui ;;
     reset) load_config && database::reset ;;
     start) shift; crontab::start "${@}" ;;
