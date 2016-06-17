@@ -748,6 +748,22 @@ Description:
   in a cron job or similar to keep the database fresh.
 TUI
       ;;
+    search)
+      cat <<SEARCH
+Usage:
+  basin search game "<name>" ["<name>"...]
+  basin search status "<string>" ["<string>"...]
+
+Description:
+  Allows to search for streams based on games or status. This will match any
+  streams playing the list of games, or having the strings as their status.
+  The first 25 matching streams (ordered by viewer count) are displayed.
+
+Note:
+  This will only search Twitch, since other services do not expose the
+  necessary search functionality.
+SEARCH
+      ;;
     reset)
       cat <<RESET
 Useage:
@@ -809,7 +825,7 @@ Options:
   -j              Use JSON instead of raw text output if applicable to the command.
 
 Commands:
-  help, useage, check, list, tui, reset, start, stop, status
+  help, useage, check, list, tui, search, reset, start, stop, status
 USEAGE
       ;;
     *) echo "No help entry for: ${1}" ;;
@@ -844,6 +860,83 @@ basin::list() { # list live channels
     database::print_formatted
 
   fi
+}
+basin::search() {
+
+  if [ $# -lt 2 ]
+  then
+    error 'You have to specify a category and a search parameter!'
+    return 1
+  fi
+
+  local type="${1}"
+
+  shift
+
+  # Twitch
+
+  local returned_data
+
+  for arg
+  do
+    case ${type} in
+      game)
+        returned_data="$(curl -s \
+          --header 'Client-ID: '${CLIENT} \
+          -H 'Accept: application/vnd.twitchtv.v3+json' \
+          --data-urlencode "game=${arg}" \
+          -G "https://api.twitch.tv/kraken/streams?limit=10")"
+        ;;
+      status)
+        returned_data="$(curl -s \
+          --header 'Client-ID: '${CLIENT} \
+          -H 'Accept: application/vnd.twitchtv.v3+json' \
+          --data-urlencode "query=\"${arg}\"" \
+          -G "https://api.twitch.tv/kraken/search/streams?limit=10")"
+        ;;
+      *)
+        error '`basin search` can only search for `game` or `status`!'
+        return 1
+    esac
+
+    json="$(echo "$returned_data" | jq -r '[
+      .streams[] |
+      {
+        service: "Twitch",
+        service_logo: "http://s.jtvnw.net/jtv_user_pictures/hosted_images/GlitchIcon_WhiteonPurple.png",
+        name: .channel.name,
+        display_name: .channel.display_name,
+        game: .game,
+        status: .channel.status,
+        url: .channel.url,
+        logo: .channel.logo,
+        viewers: .viewers
+      }
+    ]')"
+    if [[ "$OUTPUT_JSON" == "true" ]]
+    then
+      echo "$json" | jq '.'
+    else
+      echo -e "$(echo "$json" | jq -r '.[] |
+        [
+          "\n\\033[1;34m", .display_name, "\\033[0m",
+          (
+            # Properly align the game for shorter channel names
+            .display_name | length |
+            if . < 8 then
+              "\t\t"
+            else
+              "\t"
+            end
+          ),
+          "\\033[0;36m", .game, "\\033[0m\n",
+          (.viewers | tostring), " @ \\033[0;32m", .url, "\\033[0m",
+          "\n", .status
+        ] |
+        add')"
+    fi
+
+  done
 }
 basin::notify() { # determine if a channel merits notification, call notifier plugins
   local new_online_json="${1}" # JSON object parsed by service plugin
@@ -978,6 +1071,7 @@ main() {
     init) basin::init ;;
     check) basin::check ;;
     list) basin::list ;;
+    search) basin::search "${@:2}" ;;
     tui) basin::tui ;;
     reset) load_config && database::reset ;;
     start) shift; crontab::start "${@}" ;;
