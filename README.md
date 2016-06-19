@@ -42,7 +42,7 @@ edit. You can add service and notification specific settings here.
 to check your configured services and send notifications.
 
 Run basin without any arguments to get a more in-depth usage description and
-learn how to use it's built-in help command.
+learn how to use its built-in help command.
 
 
 ## Contributing
