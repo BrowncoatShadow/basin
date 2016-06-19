@@ -268,7 +268,7 @@ database::reset() { # wipes the database clean
 }
 database::print_formatted() { # pretty-prints the database
   echo -e "$(cat "${DBFILE}" | jq -r '
-    .online[] |
+    (.online // [])[] |
       [
         "\n\\033[1;34m", .display_name, "\\033[0m",
         (
