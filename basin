@@ -351,7 +351,7 @@ notifier::terminal_notifier() { # OS X Notification Center with terminal-notifie
     -appIcon "${service_logo}" \
     -contentImage "${logo}" \
     -open "${url}" \
-    >/dev/null # silently fail instead of printing useage
+    >/dev/null # silently fail instead of printing Usage
 }
 notifier::pushbullet() { # notify by PushBullet API notification
   # make sure we have a token
@@ -693,19 +693,19 @@ basin::help() { # be helpful
   case "${1}" in
     help)
       cat <<HELP
-Useage:
+Usage:
   basin help [command]
 
 Description:
-  Help will desscribe commands and how they can be used.
+  Help will describe commands and how they can be used.
 
 See Also:
-  useage
+  usage
 HELP
       ;;
     init)
       cat <<INIT
-Useage:
+Usage:
   basin init
 
 Description:
@@ -715,7 +715,7 @@ INIT
       ;;
     check)
       cat <<CHECK
-Useage:
+Usage:
   basin check
 
 Description:
@@ -737,7 +737,7 @@ LIST
       ;;
     tui)
       cat <<TUI
-Useage:
+Usage:
   basin tui
 
 Description:
@@ -758,6 +758,7 @@ Description:
   Allows to search for streams based on games or status. This will match any
   streams playing the list of games, or having the strings as their status.
   The first 10 matching streams (ordered by viewer count) are displayed.
+  If JSON output is active (-j), it will output them as a JSON array.
 
 Note:
   This will only search Twitch and Hitbox, since other services do not expose
@@ -766,7 +767,7 @@ SEARCH
       ;;
     reset)
       cat <<RESET
-Useage:
+Usage:
   basin reset
 
 Description:
@@ -776,7 +777,7 @@ RESET
       ;;
     start)
       cat <<START
-Useage:
+Usage:
   basin start [minutes]
 
 Description:
@@ -790,7 +791,7 @@ START
       ;;
     stop)
       cat <<STOP
-Useage:
+Usage:
   basin stop
 
 Description:
@@ -802,7 +803,7 @@ STOP
       ;;
     status)
       cat <<STATUS
-Useage:
+Usage:
   basin status
 
 Description:
@@ -815,9 +816,9 @@ See Also:
   start, stop
 STATUS
       ;;
-    useage)
+    usage)
       cat <<USEAGE
-Useage:
+Usage:
   basin [options] command [subcommands]
 
 Options:
@@ -825,7 +826,7 @@ Options:
   -j              Use JSON instead of raw text output if applicable to the command.
 
 Commands:
-  help, useage, check, list, tui, search, reset, start, stop, status
+  help, usage, check, list, tui, search, reset, start, stop, status
 USEAGE
       ;;
     *) echo "No help entry for: ${1}" ;;
@@ -1084,7 +1085,7 @@ main() {
     case ${opt} in
       c) ALT_CONFIG="${OPTARG}" ;;
       j) OUTPUT_JSON="true" ;;
-      h) basin::help useage; exit 0 ;;
+      h) basin::help usage; exit 0 ;;
       \?) error "Invalid option: -${OPTARG}"; exit 1 ;;
       :) error "-${OPTARG} requires an argument."; exit 1 ;;
     esac
@@ -1102,7 +1103,7 @@ main() {
     stop) crontab::stop ;;
     status) crontab::status ;;
     help) shift; basin::help "${@}" ;;
-    *|useage) basin::help useage ;;
+    *|usage) basin::help usage ;;
   esac
 }
 main "${@}"
