@@ -2,6 +2,56 @@
 # basin - all the streams you care about in once place
 # by BrowncoatShadow and Crendgrim
 # https://github.com/BrowncoatShadow/basin
+shopt -s extglob
+
+# Initial default configuration.
+CONFIG_FILE="${HOME}/.config/basin.json"
+CONFIG_DEFAULT='{
+  "check_interval": 1,
+  "database": "'"${HOME}"'/.local/share/basin/online.json",
+  "service": {
+    "twitch": {
+      "enabled": false,
+      "client_id": "",
+      "user": "",
+      "follow": []
+    },
+    "hitbox": {
+      "enabled": false,
+      "user": "",
+      "follow": []
+    },
+    "azubu": {
+      "enabled": false,
+      "follow": []
+    },
+    "periscope": {
+      "enabled": false,
+      "follow": []
+    },
+    "youtube": {
+      "enabled": false,
+      "key": "",
+      "follow": []
+    }
+  },
+  "notifier": {
+    "pushbullet": {
+      "enabled": false,
+      "token": "",
+      "target": []
+    },
+    "kdialog": {
+      "enabled": false
+    },
+    "osx": {
+      "enabled": false
+    },
+    "terminal_notifier": {
+      "enabled": false
+    }
+  }
+}'
 
 ### Helper Functions
 check_system() { # platform specific fixes and function definitions
@@ -31,127 +81,13 @@ depends_on() { # check for a given dependency, exit if missing
     exit 1
   fi
 }
-load_config() { # load configuration from file # check if alternative config file is defined
-  if [[ -n "${ALT_CONFIG}" ]]; then
-    # if the config file does not exist yet, exit with a descriptive error message
-    if [[ ! -f "${ALT_CONFIG}" ]]; then
-      error "The specified configuration file ${ALT_CONFIG} is missing."
-      error "You can create it by copying the default configuration file at \`${HOME}/.config/basinrc\`."
-      error "If that file does not exist, you can create it by running: basin init"
-      exit 1
-    fi
-
-    # use alt config file if defined
-    CFGFILE="${ALT_CONFIG}"
-  else
-    # if the config file does not exist yet, exit with a descriptive error message
-    if [[ ! -f "${HOME}/.config/basinrc" ]]; then
-      error "The default configuration file ${HOME}/.config/basinrc is missing."
-      error "You can create it by running: basin init"
-      exit 1
-    fi
-
-    # use default config file
-    CFGFILE="${HOME}/.config/basinrc"
-  fi
-
-  # load config file
-  source "${CFGFILE}"
-}
-init_config() { # generate a default configuration file
-  # if the file exists already, ask the user if he really wants to replace it
-  if [[ -f "${HOME}/.config/basinrc" ]]; then
-    local prompt_string="The configuration file \`${HOME}/.config/basinrc\` exists already. Are you sure you want to replace it? [y/N] "
-    read -p "${prompt_string}"
-    if [[ ! "${REPLY}" =~ ^[yY].* ]]; then
-      echo "Aborting config file creation..."
-      return 0
-    fi
-  fi
-  # Generate default basinrc.
-  cat > "${HOME}/.config/basinrc" <<"CONFIG"
-#!/bin/bash
-# basinrc - Configuration file for basin.
-# by BrowncoatShadow and Crendgrim
-# <https://github.com/BrowncoatShadow/basin>
-
-
-### GENERAL SETTINGS
-# DBFILE - The database file for storing currently online streams.
-#	default: DBFILE=${HOME}/.local/share/basin/online.json
-# DEBUGFILE - The file for storing debug data. This can help to debug the script itself.
-#	NOTE: This functionality is currently broken.
-#	default: DEBUGFILE=${HOME}/.local/share/basin/debug.json
-# NOTIFIER - The notification plugin to use.
-#	default: MODULE=echo
-DBFILE=${HOME}/.local/share/basin/online.json
-DEBUGFILE=${HOME}/.local/share/basin/debug.json
-NOTIFIER=echo
-
-
-### SERVICE SETTINGS
-# Settings for the various streaming services to check.
-
-### TWITCH SETTINGS
-# TWITCH_USER - Your Twitch user in all lower-case letters. If set, use this user's followed channels.
-#	default: TWITCH_USER=
-# TWITCH_FOLLOWLIST - Additional list of streams to check on, divided by spaces.
-#	default: TWITCH_FOLLOWLIST=""
-# TWITCH_CLIENT_ID - Twitch client_id, generate at <http://www.twitch.tv/kraken/oauth2/clients/new>.
-#	default: TWITCH_CLIENT_ID=
-TWITCH_USER=
-TWITCH_FOLLOWLIST=""
-TWITCH_CLIENT_ID=
-
-### HITBOX SETTINGS
-# HITBOX_USER - Your Hitbox user in all lower-case letters. If set, use this user's followed channels.
-#	default: HITBOX_USER=
-# HITBOX_FOLLOWLIST - Additional list of streams to check on, divided by spaces.
-#	default: HITBOX_FOLLOWLIST=""
-HITBOX_USER=
-HITBOX_FOLLOWLIST=""
-
-### AZUBU SETTINGS
-# AZUBU_FOLLOWLIST - List of streams to check on, divided by spaces.
-# default: AZUBU_FOLLOWLIST=""
-AZUBU_FOLLOWLIST=""
-
-### PERISCOPE SETTINGS
-# PERISCOPE_FOLLOWLIST - List of streams to check on, divided by spaces.
-# default: PERISCOPE_FOLLOWLIST=""
-PERISCOPE_FOLLOWLIST=
-
-### YOUTUBE SETTINGS
-# YOUTUBE_KEY - (Required) Youtube API key with "YouTube Data API v3" enabled.
-# YOUTUBE_FOLLOWLIST - List of youtube users whose channels's to check on, devices by spaces.
-YOUTUBE_KEY=""
-YOUTUBE_FOLLOWLIST=""
-
-
-### NOTIFIER SETTINGS
-# Settings for the user-visable notifications for changes to a stream status.
-
-### PUSHBULLET SETTINGS
-# Note: If PB_URLTARGET and PB_URITARGET are unset, the module will send to all targets.
-#
-# PB_TOKEN - Pushbullet access token. Find at <https://www.pushbullet.com/account>
-#	default: PB_TOKEN=
-# PB_TARGET - Space seperated list of pushbullet device_idens to send the notification to. If this is not set, notification will be sent to all devices.
-#	default: PB_TARGET=""
-PB_TOKEN=
-PB_TARGET=""
-CONFIG
-  # TODO Is this best practice?
-  # open the new basinrc with the users ${EDITOR}, so they can configure it
-  ${EDITOR} "${HOME}/.config/basinrc"
-}
 check_file() { # generate given folders and files if they do not exist
   if [[ ! -f ${1} ]]; then
     mkdir -p $(dirname ${1})
-    touch ${1}
+    touch "${1}"
   fi
-  if [[ -z $(cat ${1}) ]]; then
-    echo ${2} > ${1}
+  if [[ -z "$(cat ${1})" ]]; then
+    echo "${2}" > "${1}"
   fi
 }
 json_get() { # get channel data from an array of channel objects
@@ -167,8 +103,8 @@ playing_check() { # return null if given game is null, return given "playing" st
 }
 preflight() { # handles all common tasks that should be taken before normal operations
   check_system
-  load_config
-  database::health
+  config::load
+  database::load
 }
 
 ### Crontab
@@ -191,24 +127,26 @@ crontab::status() { # prints basin's status to terminal
   fi
 }
 crontab::start() { # create basin's crontab entry
+  local check_interval
+  if [[ "${1}" ]]; then
+    check_interval="${1}"
+  else
+    config::load # no preflight so manually load config first
+    check_interval="$(config::get .check_interval)"
+  fi
+
   if crontab::running; then
     error "Basin is already running."
     exit 1
   fi
-  # if given an argument, use it as the number of minutes between checks
-  local minutes
-  if [[ "${1}" ]]; then
-    if [[ ! "${1}" =~ ^[0-9]+$ || "${1}" -lt 1  ]]; then
-      error "Minutes for 'start' need to be a number, greater than 1."
-    else
-      minutes="${1}"
-    fi
-  else
-    minutes=1
+  if [[ ! "${check_interval}" =~ ^[0-9]+$ || "${check_interval}" -lt 1  ]]; then
+    error "Argument for 'start' needs to be a number of minutes, greater than 1."
+    exit 1
   fi
+
   local source_dir
   source_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-  local entry="*/${minutes} * * * * ${source_dir}/basin check >/dev/null 2>&1"
+  local entry="*/${check_interval} * * * * ${source_dir}/basin check >/dev/null 2>&1"
 
   # list crontab, concat that output with basin's entry, feed back to crontab
   EDITOR=cat crontab -e 2> /dev/null | { cat; echo "${entry}"; } | crontab -
@@ -222,10 +160,121 @@ crontab::stop() { # remove basin's crontab entry
   EDITOR=cat crontab -e 2> /dev/null | sed '/basin check/d' | crontab -
 }
 
+### Config
+# Functions that manage configuration.
+config::load() { # load the configuration and create it if it does not exist
+  if [[ "${ALT_CONFIG}" ]]; then
+    CONFIG_FILE="${ALT_CONFIG}"
+  fi
+  check_file "${CONFIG_FILE}" "${CONFIG_DEFAULT}"
+  CONFIG="$(cat "${CONFIG_FILE}")"
+}
+config::key_type() { # return the type class of a configuration key
+  if [[ -z "${1}" ]]; then
+    return # no value given
+  fi
+  echo "${CONFIG_DEFAULT}" | jq -r "${1} | type"
+}
+config::validate_key() { # make sure a given key is valid and not an object
+  if [[ ! "${1}" == .* ]]; then
+    error "Configuration keys must start with a period."
+    exit 1
+  fi
+
+  # jq can only test if a key exists in the root of a given object, so we need
+  # to iterate over each key in the given key path and make sure each parent
+  # object exists, in order, until we get to our final child key.
+  IFS='.' read -ra keys <<< "${1:1}"
+  local parent
+  for child in "${keys[@]}"; do
+    if echo "${CONFIG_DEFAULT}" | jq -e "${parent:-.} | has(\"${child}\")" &>/dev/null; then
+      parent="${parent}.${child}"
+    else
+      error "${1} is not a valid configuration key."
+      exit 1
+    fi
+  done
+
+  if [[ "$(config::key_type "${1}")" == "object" ]]; then
+    error "Configuration key \"${1}\" is an object and cannot be set."
+    exit 1
+  fi
+}
+config::enabled_keys() { # list services or notifiers that are enabled
+  local possible_enabled user_enabled
+  possible_enabled="$(echo "${CONFIG_DEFAULT}" | jq -r "${1} | keys")"
+  user_enabled="$(echo "${CONFIG}" | jq -r "
+    [
+    ${1} | to_entries[] |
+      if .value.enabled == true then
+        .key
+      else
+        empty
+      end
+    ]")"
+  # Make sure the user has not "enabled" any items in their config that are not
+  # actually supported, by checking against the keys in the default config.
+  echo "${possible_enabled}" | jq -r ". - (. - ${user_enabled}) | .[] | tostring"
+}
+config::get() { # print the value of a key
+  if [[ "$(config::key_type "${1}")" == "array" ]]; then
+    echo "${CONFIG}" | jq -r "${1} | .[] | tostring"
+  else
+    echo "${CONFIG}" | jq -r "${1}"
+  fi
+}
+config::set() { # set the value of a key
+  config::validate_key "${1}"
+
+  if [[ "${2}" == @(?(-)+([.0-9])|true|false) ]]; then
+    local value="${2}"
+  else
+    local value="\"${2}\""
+  fi
+
+  echo "${CONFIG}" | jq "${1} = ${value}" > "${CONFIG_FILE}"
+}
+config::mod_array() { # add or remove items from a given key that is an array
+  local config="${CONFIG}"
+  local mod="${1}"
+  local key="${2}"
+  shift 2
+
+  config::validate_key "${key}"
+
+  if [[ "$(config::key_type "${key}")" == "array" ]]; then
+    for item in "${@}"; do
+      config="$(echo "${config}" | jq "${key} |= (. ${mod} [\"${item}\"] | unique)")"
+    done
+    echo "${config}" > "${CONFIG_FILE}"
+  else
+    error "${1} is not an array."
+    exit 1
+  fi
+}
+config::do () { # handle the 'config' command
+  config::load
+  case ${1} in
+    get) shift; config::get "${@}" ;;
+    set) shift; config::set "${@}" ;;
+    add) shift; config::mod_array + "${@}" ;;
+    remove) shift; config::mod_array - "${@}" ;;
+    *) error "${1} is not a supported config action."; exit 1 ;;
+  esac
+}
+
 ### Database
 # Functions that handle the local database.
+database::load() { # makes sure the DB file exists and is not too old
+  DATABASE_FILE="$(config::get .database)"
+
+  check_file "${DATABASE_FILE}" "{}"
+  # cleanup: if the database file is older than 2 hours, consider it outdated
+  # and remove its contents
+  [[ -s "${DATABASE_FILE}" && $(($(date +%s)-$(cat "${DATABASE_FILE}" | jq -r '.lastcheck // 0'))) -gt 7200 ]] && database::reset
+}
 database::get() { # get data from the database
-  cat "${DBFILE}" \
+  cat "${DATABASE_FILE}" \
     | jq -r '(.online // [])[] | select(.service=="'${1}'" and .name=="'${2}'") | .'${3}
 }
 database::include() { # add arrayed online channel objects to global list to be added to db
@@ -234,10 +283,10 @@ database::include() { # add arrayed online channel objects to global list to be 
     new_online_db="$(echo "${new_online_db}" | jq ". + ${1}")"
   fi
 }
-database::write() { # save given json object to the DBFILE
-  if [[ -n "${DBFILE}" ]]; then
+database::write() { # save given json object to the DATABASE_FILE
+  if [[ -n "${DATABASE_FILE}" ]]; then
     echo "${1}" \
-      | jq '{online: ., lastcheck: '$(date +%s)'}' > ${DBFILE}
+      | jq '{online: ., lastcheck: '$(date +%s)'}' > ${DATABASE_FILE}
   fi
 }
 database::recover() { # recover an existing DB entry for broken API results
@@ -257,17 +306,12 @@ database::recover() { # recover an existing DB entry for broken API results
     echo "${json}"
   fi
 }
-database::health() { # makes sure the DB file exists and is not too old
-  check_file "${DBFILE}" "{}"
-  # cleanup: if the database file is older than 2 hours, consider it outdated
-  # and remove its contents
-  [[ -s "${DBFILE}" && $(($(date +%s)-$(cat "${DBFILE}" | jq -r '.lastcheck // 0'))) -gt 7200 ]] && database::reset
-}
 database::reset() { # wipes the database clean
-  echo "{}" > "${DBFILE}"
+  DATABASE_FILE="$(config::get .database)"
+  echo "{}" > "${DATABASE_FILE}"
 }
 database::print_formatted() { # pretty-prints the database
-  echo -e "$(cat "${DBFILE}" | jq -r '
+  echo -e "$(cat "${DATABASE_FILE}" | jq -r '
     (.online // [])[] |
       [
         "\n\\033[1;34m", .display_name, "\\033[0m",
@@ -351,14 +395,18 @@ notifier::terminal_notifier() { # OS X Notification Center with terminal-notifie
     -appIcon "${service_logo}" \
     -contentImage "${logo}" \
     -open "${url}" \
-    >/dev/null # silently fail instead of printing Usage
+    >/dev/null # silently fail instead of printing Useage
 }
 notifier::pushbullet() { # notify by PushBullet API notification
-  # make sure we have a token
-  if [[ -z "${PB_TOKEN}" ]]; then
-    error "You need to set PB_TOKEN in your settings file."
-    exit 1
+  local pushbullet_token pushbullet_targets
+  pushbullet_token="$(config::get .notifier.pushbullet.token)"
+  pushbullet_targets="$(config::get .notifier.pushbullet.target)"
+
+  if [[ -z "${pushbullet_token}" ]]; then
+    error "Missing configuration key: .notifier.pushbullet.token"
+    return 1
   fi
+
   local service display_name game status url
   service="$(chan_get "${1}" 'service')"
   display_name="$(chan_get "${1}" 'display_name')"
@@ -367,7 +415,6 @@ notifier::pushbullet() { # notify by PushBullet API notification
   game="$(chan_get "${1}" 'game')"
   playing="$(playing_check "${game}" " playing ${game}")"
 
-  # function to send pushes
   push() {
     local data
     data='{
@@ -379,15 +426,15 @@ notifier::pushbullet() { # notify by PushBullet API notification
     }'
     curl -s \
       -X POST https://api.pushbullet.com/v2/pushes \
-      --header 'Access-Token: '${PB_TOKEN}'' \
+      --header 'Access-Token: '${pushbullet_token}'' \
       --header 'Content-Type: application/json' \
       --data-binary "${data}" \
       > /dev/null
   }
 
   # push to any targets that are defined
-  if [[ -n "${PB_TARGET}" ]]; then
-    for target in ${PB_TARGET}; do
+  if [[ -n "${pushbullet_targets}" ]]; then
+    for target in ${pushbullet_targets}; do
       push ${target}
     done
   else # if no targets, push to all
@@ -398,19 +445,30 @@ notifier::pushbullet() { # notify by PushBullet API notification
 ### Service Plugins
 # Plugins that provide support for a particular streaming service.
 service::twitch() { # https://www.twitch.tv/
-  if [[ -z "${TWITCH_USER}" && -z "${TWITCH_FOLLOWLIST}" ]]; then
-    return 0 # nothing to check
+  local twitch_client_id twitch_user twitch_follow
+  twitch_client_id="$(config::get .service.twitch.client_id)"
+  twitch_user="$(config::get .service.twitch.user)"
+  twitch_follow="$(config::get .service.twitch.follow)"
+
+  if [[ -z "${twitch_client_id}" ]]; then
+    error "Missing configuration key: .service.twitch.client_id"
+    return 1
   fi
-  # use the specified followlist, if set
-  local twitch_list=${TWITCH_FOLLOWLIST}
+  if [[ -z "${twitch_user}" && -z "${twitch_follow}" ]]; then
+    error "Missing configuration key: .service.twitch.user AND/OR .service.twitch.follow"
+    return 1
+  fi
+
+  # begin the master list of channels to check
+  local twitch_list=${twitch_follow}
 
   # if user is set, fetch user's follow list and add them to the list
-  if [[ -n ${TWITCH_USER} ]]; then 
+  if [[ -n ${twitch_user} ]]; then 
     twitch_list="${twitch_list} \
       "$(curl -s \
-      --header 'Client-ID: '${TWITCH_CLIENT_ID} \
+      --header 'Client-ID: '${twitch_client_id} \
       -H 'Accept: application/vnd.twitchtv.v3+json' \
-      -X GET "https://api.twitch.tv/kraken/users/${TWITCH_USER}/follows/channels?limit=100" \
+      -X GET "https://api.twitch.tv/kraken/users/${twitch_user}/follows/channels?limit=100" \
       | jq -r '.follows[] | .channel.name' \
       | tr '\n' ' ')
   fi
@@ -455,7 +513,7 @@ service::twitch() { # https://www.twitch.tv/
     if [[ "${check_game}" == null && "${check_status}" == null ]]; then
       # if the stream was live before, assume the results to be broken, so we
       # don't re-notify
-      if [[ -n "${DBFILE}" ]]; then
+      if [[ -n "${DATABASE_FILE}" ]]; then
         # recover existing db entry if it exists
         new_online_json="$(database::recover "${service}" "${new_online_json}" "${channel}")"
       fi
@@ -470,16 +528,22 @@ service::twitch() { # https://www.twitch.tv/
   database::include "${new_online_json}"
 }
 service::hitbox() { # http://www.hitbox.tv/
-  if [[ -z "${HITBOX_USER}" && -z "${HITBOX_FOLLOWLIST}" ]]; then
-    return 0 # nothing to check
+  local hitbox_user hitbox_follow
+  hitbox_user="$(config::get .service.hitbox.user)"
+  hitbox_follow="$(config::get .service.hitbox.follow)"
+
+  if [[ -z "${hitbox_user}" && -z "${hitbox_follow}" ]]; then
+    error "Missing configuration key: .service.hitbox.user AND/OR .service.hitbox.follow"
+    return 1
   fi
+
   # use the specified followlist, if set
-  local hitbox_list="${HITBOX_FOLLOWLIST}"
+  local hitbox_list="${hitbox_follow}"
   # if user is set, fetch user's follow list and add them to the list
-  if [[ -n "${HITBOX_USER}" ]]; then
+  if [[ -n "${hitbox_user}" ]]; then
     hitbox_list="${hitbox_list} \
     "$(curl -s \
-    -X GET "https://api.hitbox.tv/following/user/?user_name=${HITBOX_USER}" \
+    -X GET "https://api.hitbox.tv/following/user/?user_name=${hitbox_user}" \
     | jq -r '.following[] | .user_name' \
     | tr '\n' ' ')
   fi
@@ -501,7 +565,7 @@ service::hitbox() { # http://www.hitbox.tv/
 
     if [[ $? == 4 ]]; then
       # insert entry recovered from database
-      if [[ -n "${DBFILE}" ]]; then
+      if [[ -n "${DATABASE_FILE}" ]]; then
         # recover existing db entry if it exists
         new_online_json="$(database::recover "${service}" "${new_online_json}" "${channel}")"
       fi
@@ -534,12 +598,17 @@ service::hitbox() { # http://www.hitbox.tv/
   database::include "${new_online_json}"
 }
 service::azubu() { # http://www.azubu.tv/
-  if [[ -z "${AZUBU_FOLLOWLIST}" ]]; then
-    return 0 # nothing to check
+  local azubu_follow
+  azubu_follow="$(config::get .service.azubu.follow)"
+
+  if [[ -z "${azubu_follow}" ]]; then
+    error "Missing configuration key: .service.azubu.follow"
+    return 1
   fi
+
   # remove duplicates from the list
   local azubu_list
-  azubu_list=$(echo $(printf '%s\n' ${AZUBU_FOLLOWLIST} | sort -u))
+  azubu_list=$(echo $(printf '%s\n' ${azubu_follow} | sort -u))
   # sanitize the list for the fetch url
   local url_list
   url_list=$(echo ${azubu_list} | sed 's/ /\,/g')
@@ -575,15 +644,19 @@ service::azubu() { # http://www.azubu.tv/
   database::include "${new_online_json}"
 }
 service::periscope() { # https://www.periscope.tv/
-  if [[ -z "${PERISCOPE_FOLLOWLIST}" ]]; then
-    return 0 # nothing to check
+  local periscope_follow
+  periscope_follow="$(config::get .service.periscope.follow)"
+
+  if [[ -z "${periscope_follow}" ]]; then
+    error "Missing configuration key: .service.periscope.follow"
+    return 1
   fi
 
   # remove duplicates from the list
-  PERISCOPE_FOLLOWLIST=$(echo $(printf '%s\n' ${PERISCOPE_FOLLOWLIST} | sort -u))
+  periscope_follow=$(echo $(printf '%s\n' ${periscope_follow} | sort -u))
 
   local new_online_json='[]'
-  for channel in ${PERISCOPE_FOLLOWLIST}; do
+  for channel in ${periscope_follow}; do
 
     local raw_html
     raw_html="$(curl -s https://www.periscope.tv/${channel})"
@@ -622,31 +695,36 @@ service::periscope() { # https://www.periscope.tv/
   done
 
   # notify for new streams
-  for channel in ${PERISCOPE_FOLLOWLIST}; do
+  for channel in ${periscope_follow}; do
     basin::notify "${new_online_json}" ${channel}
   done
 
   database::include "${new_online_json}"
 }
 service::youtube() { # https://www.youtube.com/
-  if [[ -z "${YOUTUBE_FOLLOWLIST}" ]]; then
-    return 0 # nothing to check
+  local youtube_key youtube_follow
+  youtube_key="$(config::get .service.youtube.key)"
+  youtube_follow="$(config::get .service.youtube.follow)"
+
+  if [[ -z "${youtube_key}" ]]; then
+    error "Missing configuration key: .service.youtube.key"
+    return 1
   fi
-  if [[ -z "${YOUTUBE_KEY}" ]]; then
-    error "You need to set YOUTUBE_KEY in your settings file."
+  if [[ -z "${youtube_follow}" ]]; then
+    error "Missing configuration key: .service.youtube.follow"
     return 1
   fi
 
   # remove duplicates from the list
-  YOUTUBE_FOLLOWLIST=$(echo $(printf '%s\n' ${YOUTUBE_FOLLOWLIST} | sort -u))
+  youtube_follow=$(echo $(printf '%s\n' ${youtube_follow} | sort -u))
 
   # define some api url strings
   local yt_api="https://www.googleapis.com/youtube/v3/"
-  local yt_user_search="${yt_api}channels?part=snippet&key=${YOUTUBE_KEY}&forUsername="
-  local yt_live_search="${yt_api}search?part=snippet&eventType=live&type=video&key=${YOUTUBE_KEY}&channelId="
+  local yt_user_search="${yt_api}channels?part=snippet&key=${youtube_key}&forUsername="
+  local yt_live_search="${yt_api}search?part=snippet&eventType=live&type=video&key=${youtube_key}&channelId="
 
   local new_online_json='[]'
-  for channel in ${YOUTUBE_FOLLOWLIST}; do
+  for channel in ${youtube_follow}; do
     # get the channel id for a youtube user
     local user_data="$(curl -s -X GET ${yt_user_search}${channel})"
     local chan_id
@@ -680,7 +758,7 @@ service::youtube() { # https://www.youtube.com/
   done
 
   # notify for new streams
-  for channel in ${YOUTUBE_FOLLOWLIST}; do
+  for channel in ${youtube_follow}; do
     basin::notify "${new_online_json}" ${channel}
   done
 
@@ -693,29 +771,39 @@ basin::help() { # be helpful
   case "${1}" in
     help)
       cat <<HELP
-Usage:
+Useage:
   basin help [command]
 
 Description:
   Help will describe commands and how they can be used.
 
 See Also:
-  usage
+  useage
 HELP
       ;;
-    init)
-      cat <<INIT
-Usage:
-  basin init
+    config)
+      cat <<CONFIG
+Useage:
+  basin config <action> [key] [value]
 
 Description:
-  Creates a new configuration file at ~/.config/basinrc, and opens it in the
-  user's EDITOR to be customized.
-INIT
+  Gets and sets configuration values in the configuration file.
+
+Actions:
+  get [key]
+        Gets the value of a given key. If no key is given, it will print the
+        whole config.
+  set <key> <value>
+        Sets the given key to the given value.
+  add <key> <value>
+        Adds the given value to the key which is an array.
+  remove <key> <value>
+        Removes the given value from the key which is an array.
+CONFIG
       ;;
     check)
       cat <<CHECK
-Usage:
+Useage:
   basin check
 
 Description:
@@ -727,7 +815,7 @@ CHECK
       ;;
     list)
       cat <<LIST
-Usage:
+Useage:
   basin [-j] list
 
 Description:
@@ -737,7 +825,7 @@ LIST
       ;;
     tui)
       cat <<TUI
-Usage:
+Useage:
   basin tui
 
 Description:
@@ -750,7 +838,7 @@ TUI
       ;;
     search)
       cat <<SEARCH
-Usage:
+Useage:
   basin search game "<name>" ["<name>"...]
   basin search status "<string>" ["<string>"...]
 
@@ -767,7 +855,7 @@ SEARCH
       ;;
     reset)
       cat <<RESET
-Usage:
+Useage:
   basin reset
 
 Description:
@@ -777,7 +865,7 @@ RESET
       ;;
     start)
       cat <<START
-Usage:
+Useage:
   basin start [minutes]
 
 Description:
@@ -791,7 +879,7 @@ START
       ;;
     stop)
       cat <<STOP
-Usage:
+Useage:
   basin stop
 
 Description:
@@ -803,7 +891,7 @@ STOP
       ;;
     status)
       cat <<STATUS
-Usage:
+Useage:
   basin status
 
 Description:
@@ -816,9 +904,9 @@ See Also:
   start, stop
 STATUS
       ;;
-    usage)
+    useage)
       cat <<USEAGE
-Usage:
+Useage:
   basin [options] command [subcommands]
 
 Options:
@@ -826,26 +914,21 @@ Options:
   -j              Use JSON instead of raw text output if applicable to the command.
 
 Commands:
-  help, usage, check, list, tui, search, reset, start, stop, status
+  help, useage, config, check, list, tui, reset, search, start, stop, status
 USEAGE
       ;;
     *) echo "No help entry for: ${1}" ;;
   esac
 }
-basin::init() { # initialize environment
-  init_config
-  crontab::start
-  exit 0
-}
 basin::check() { # call each service plugin, collect their data for database
   preflight
   new_online_db='[]'
 
-  service::twitch
-  service::hitbox
-  service::azubu
-  service::periscope
-  service::youtube
+  local service_call
+  for service in $(config::enabled_keys .service); do
+    service_call="service::${service}"
+    ${service_call}
+  done
 
   database::write "${new_online_db}"
 }
@@ -854,7 +937,7 @@ basin::list() { # list live channels
   if [[ "$OUTPUT_JSON" == "true" ]]
   then
 
-    cat "${DBFILE}" | jq '(.online // [])'
+    cat "${DATABASE_FILE}" | jq '(.online // [])'
 
   else
 
@@ -976,7 +1059,7 @@ basin::notify() { # determine if a channel merits notification, call notifier pl
     local notify=true
 
     # check if it has been active since last check
-    if [[ -n "${DBFILE}" ]]; then
+    if [[ -n "${DATABASE_FILE}" ]]; then
       local service dbcheck
       service="$(json_get "${new_online_json}" "${channel}" 'service')"
       dbcheck="$(database::get ${service} ${name} 'name')"
@@ -997,9 +1080,11 @@ basin::notify() { # determine if a channel merits notification, call notifier pl
     fi
 
     if [[ ${notify} == true ]]; then
-      # send notification by using the module and giving it the arguments
-      local notifier="notifier::${NOTIFIER}"
-      ${notifier} "$(json_get "${new_online_json}" "${channel}")"
+      local notifier_call
+      for notifier in $(config::enabled_keys .notifier); do
+        notifier_call="notifier::${notifier}"
+        ${notifier_call} "$(json_get "${new_online_json}" "${channel}")"
+      done
     fi
   fi
 }
@@ -1017,9 +1102,9 @@ basin::tui() { # display DB items using a text-based user interface
   tui_display() { # generate the output for the interactive menu
     tput clear
 
-    database::health
+    database::load
     local last_checked
-    last_checked=$(cat ${DBFILE} | jq -r '.lastcheck // 0')
+    last_checked=$(cat ${DATABASE_FILE} | jq -r '.lastcheck // 0')
     if [[ ${last_checked} -eq 0 ]]; then
       error "Database is stale. Try updating with: basin check"
     else
@@ -1083,7 +1168,7 @@ main() {
     case ${opt} in
       c) ALT_CONFIG="${OPTARG}" ;;
       j) OUTPUT_JSON="true" ;;
-      h) basin::help usage; exit 0 ;;
+      h) basin::help useage; exit 0 ;;
       \?) error "Invalid option: -${OPTARG}"; exit 1 ;;
       :) error "-${OPTARG} requires an argument."; exit 1 ;;
     esac
@@ -1091,17 +1176,17 @@ main() {
   shift $((OPTIND-1))
 
   case ${1} in
-    init) basin::init ;;
     check) basin::check ;;
+    config) shift; config::do "${@}" ;;
     list) basin::list ;;
     search) basin::search "${@:2}" ;;
     tui) basin::tui ;;
-    reset) load_config && database::reset ;;
+    reset) config::load && database::reset ;;
     start) shift; crontab::start "${@}" ;;
     stop) crontab::stop ;;
     status) crontab::status ;;
     help) shift; basin::help "${@}" ;;
-    *|usage) basin::help usage ;;
+    *|useage) basin::help useage ;;
   esac
 }
 main "${@}"
