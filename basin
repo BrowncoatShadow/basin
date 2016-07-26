@@ -244,7 +244,7 @@ config::default_path() { # get the path to the specification for a key
 config::enabled_keys() { # list services or notifiers that are enabled
   local possible_enabled user_enabled
   possible_enabled="$(echo "${CONFIG_STRUCTURE}" | jq -r "${1}.content | keys")"
-  user_enabled="$(echo "${CONFIG}" | jq -r "[.${1} | to_entries[] | select(.value.enabled == true) .key]")"
+  user_enabled="$(echo "${CONFIG}" | jq -r "[${1} | to_entries[] | select(.value.enabled == true) .key]")"
   # Make sure the user has not "enabled" any items in their config that are not
   # actually supported, by checking against the keys in the default config.
   echo "${possible_enabled}" | jq -r ". - (. - ${user_enabled}) | .[] | tostring"
