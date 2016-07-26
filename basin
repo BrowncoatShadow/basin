@@ -205,6 +205,13 @@ config::_gen() { # recursively generate the configuration
 
 }
 config::key_type() { # return the type class of a configuration key
+  local path
+  path="$(config::default_path "${1}")"
+  [ $? -ne 0 ] && exit 1
+
+  echo "$(echo "${CONFIG_STRUCTURE}" | jq -r "${path}.type // null")"
+}
+config::default_path() { # get the path to the specification for a key
   if [[ -z "${1}" ]]; then
     return # no value given
   fi
@@ -231,7 +238,7 @@ config::key_type() { # return the type class of a configuration key
     exit 1
   fi
 
-  echo "${type}"
+  echo "${path}"
 
 }
 config::enabled_keys() { # list services or notifiers that are enabled
@@ -306,6 +313,18 @@ config::mod_array() { # add or remove items from a given key that is an array
 
   echo "${CONFIG}" > "${CONFIG_FILE}"
 }
+config::reset() { # reset a key to its default value
+  local path
+  path="$(config::default_path "${1}")"
+  [ $? -ne 0 ] && exit 1
+
+  local value="$(echo "${CONFIG_STRUCTURE}" | jq -r "${path}.default")"
+  if [ -z "${value}" ]; then
+    error "Found no default value for ${1}!"
+  else
+    config::set "${1}" "${value}"
+  fi
+}
 config::do () { # handle the 'config' command
   config::load
   case ${1} in
@@ -313,6 +332,7 @@ config::do () { # handle the 'config' command
     set) shift; config::set "${@}" ;;
     add) shift; config::mod_array + "${@}" ;;
     remove) shift; config::mod_array - "${@}" ;;
+    reset) shift; config::reset "${@}" ;;
     *) error "${1} is not a supported config action."; exit 1 ;;
   esac
 }
@@ -851,6 +871,8 @@ Actions:
         whole config.
   set <key> <value>
         Sets the given key to the given value.
+  reset <key>
+        Resets the given key to its default value.
   add <key> <value>
         Adds the given value to the key which is an array.
   remove <key> <value>
