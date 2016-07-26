@@ -6,51 +6,51 @@ shopt -s extglob
 
 # Initial default configuration.
 CONFIG_FILE="${HOME}/.config/basin.json"
-CONFIG_DEFAULT='{
-  "check_interval": 1,
-  "database": "'"${HOME}"'/.local/share/basin/online.json",
-  "service": {
-    "twitch": {
-      "enabled": false,
-      "client_id": "",
-      "user": "",
-      "follow": []
-    },
-    "hitbox": {
-      "enabled": false,
-      "user": "",
-      "follow": []
-    },
-    "azubu": {
-      "enabled": false,
-      "follow": []
-    },
-    "periscope": {
-      "enabled": false,
-      "follow": []
-    },
-    "youtube": {
-      "enabled": false,
-      "key": "",
-      "follow": []
-    }
-  },
-  "notifier": {
-    "pushbullet": {
-      "enabled": false,
-      "token": "",
-      "target": []
-    },
-    "kdialog": {
-      "enabled": false
-    },
-    "osx": {
-      "enabled": false
-    },
-    "terminal_notifier": {
-      "enabled": false
-    }
-  }
+CONFIG_STRUCTURE='{
+  "check_interval": { "type": "number", "default": 1, "description": "How often basin runs the online check (in minutes) when installed via cron" },
+  "database": { "type": "string", "default": "'"${HOME}"'/.local/share/basin/online.json" },
+  "service": { "type": "object", "description": "Configure the service providers", "content": {
+    "twitch": { "type": "object", "description": "Configure Twitch", "content": {
+      "enabled": { "type": "boolean", "default": false, "description": "Whether this service gets called at all" },
+      "client_id": { "type": "string", "default": "", "description": "A Twitch API Client-ID is required for all calls to the Twitch API. Generate it at < https://www.twitch.tv/kraken/oauth2/clients/new >." },
+      "user": { "type": "string", "default": "", "description": "Your username on Twitch. basin will get the list of your followed channels and check these." },
+      "follow": { "type": "array-string", "default": [], "description": "A list of Twitch channels to follow" }
+    } },
+    "hitbox": { "type": "object", "description": "Configure Hitbox", "content": {
+      "enabled": { "type": "boolean", "default": false, "description": "Whether this service gets called at all" },
+      "user": { "type": "string", "default": "", "description": "Your username on Hitbox. basin will get the list of your followed channels and check these." },
+      "follow": { "type": "array-string", "default": [], "description": "A list of Hitbox channels to follow" }
+    } },
+    "azubu": { "type": "object", "description": "Configure Azubu", "content": {
+      "enabled": { "type": "boolean", "default": false, "description": "Whether this service gets called at all" },
+      "follow": { "type": "array-string", "default": [], "description": "A list of Azubu channels to follow" }
+    } },
+    "periscope": { "type": "object", "description": "Configure Periscope", "content": {
+      "enabled": { "type": "boolean", "default": false, "description": "Whether this service gets called at all" },
+      "follow": { "type": "array-string", "default": [], "description": "A list of Periscope channels to follow" }
+    } },
+    "youtube": { "type": "object", "description": "Configure YouTube", "content": {
+      "enabled": { "type": "boolean", "default": false, "description": "Whether this service gets called at all" },
+      "key": { "type": "string", "default": "", "description": "A YouTube API key is required for all calls to the YouTube API." },
+      "follow": { "type": "array-string", "default": [], "description": "A list of YouTube channels to follow" }
+    } }
+  } },
+  "notifier": { "type": "object", "description": "Configure notifier modules", "content": {
+    "pushbullet": { "type": "object", "description": "Configure PushBullet", "content": {
+      "enabled": { "type": "boolean", "default": false, "description": "Whether this notifier gets called" },
+      "token": { "type": "string", "default": "", "description":  "Your PushBullet token" },
+      "target": { "type": "array-string", "default": [], "description": "A list of targets to push the notification to" }
+    } },
+    "kdialog": { "type": "object", "description": "Configure KDialog (Plasma) notifications", "content": {
+      "enabled": { "type": "boolean", "default": false, "description": "Whether this notifier gets called" }
+    } },
+    "osx": { "type": "object", "description": "Configure OSX notifications", "content": {
+      "enabled": { "type": "boolean", "default": false, "description": "Whether this notifier gets called" }
+    } },
+    "terminal_notifier": { "type": "object", "description": "Configure terminal notifier", "content": {
+      "enabled": { "type": "boolean", "default": false, "description": "Whether this notifier gets called" }
+    } }
+  } }
 }'
 
 ### Helper Functions
@@ -87,7 +87,7 @@ check_file() { # generate given folders and files if they do not exist
     touch "${1}"
   fi
   if [[ -z "$(cat ${1})" ]]; then
-    echo "${2}" > "${1}"
+    ${2} > "${1}"
   fi
 }
 json_get() { # get channel data from an array of channel objects
@@ -166,91 +166,145 @@ config::load() { # load the configuration and create it if it does not exist
   if [[ "${ALT_CONFIG}" ]]; then
     CONFIG_FILE="${ALT_CONFIG}"
   fi
-  check_file "${CONFIG_FILE}" "${CONFIG_DEFAULT}"
+  check_file "${CONFIG_FILE}" "config::generate"
   CONFIG="$(cat "${CONFIG_FILE}")"
+}
+config::generate() { # generate a blank configuration
+  config::_gen "${CONFIG_STRUCTURE}" | jq '.'
+}
+config::_gen() { # recursively generate the configuration
+
+  echo "{"
+
+  local keys="$(echo "${1}" | jq -r 'keys[]')"
+  local first=true
+  local type description default
+  for key in ${keys}; do
+    if [ "${first}" == "true" ]; then
+      first=false
+    else
+      echo ","
+    fi
+    type="$(echo "${1}" | jq -r ".${key}.type")"
+    description="$(echo "${1}" | jq -r ".${key}.description // \"\"")"
+    default="$(echo "${1}" | jq -r ".${key}.default")"
+    case "${type}" in
+      object)
+        echo "\"${key}\":"
+        config::_gen "$(echo "${1}" | jq ".${key}.content // {}")"
+        ;;
+      array-*|number|boolean)
+        echo "\"${key}\": ${default}"
+        ;;
+      *)
+        echo "\"${key}\": \"${default}\""
+    esac
+  done
+
+  echo "}"
+
 }
 config::key_type() { # return the type class of a configuration key
   if [[ -z "${1}" ]]; then
     return # no value given
   fi
-  echo "${CONFIG_DEFAULT}" | jq -r "${1} | type"
-}
-config::validate_key() { # make sure a given key is valid and not an object
-  if [[ ! "${1}" == .* ]]; then
-    error "Configuration keys must start with a period."
-    exit 1
-  fi
 
-  # jq can only test if a key exists in the root of a given object, so we need
-  # to iterate over each key in the given key path and make sure each parent
-  # object exists, in order, until we get to our final child key.
+  local path type
+  local no_child=false
   IFS='.' read -ra keys <<< "${1:1}"
-  local parent
   for child in "${keys[@]}"; do
-    if echo "${CONFIG_DEFAULT}" | jq -e "${parent:-.} | has(\"${child}\")" &>/dev/null; then
-      parent="${parent}.${child}"
-    else
-      error "${1} is not a valid configuration key."
+    if [ "${no_child}" == "true" ]; then
+      error "Configuration key ${1} not found!"
       exit 1
+    fi
+    path="${path}.${child}"
+    type="$(echo "${CONFIG_STRUCTURE}" | jq -r "${path}.type // null")"
+    if [ "${type}" == "object" ]; then
+      path="${path}.content"
+    else
+      no_child=true
     fi
   done
 
-  if [[ "$(config::key_type "${1}")" == "object" ]]; then
-    error "Configuration key \"${1}\" is an object and cannot be set."
+  if [ "${type}" == "null" ]; then
+    error "Configuration key ${1} not found!"
     exit 1
   fi
+
+  echo "${type}"
+
 }
 config::enabled_keys() { # list services or notifiers that are enabled
   local possible_enabled user_enabled
-  possible_enabled="$(echo "${CONFIG_DEFAULT}" | jq -r "${1} | keys")"
-  user_enabled="$(echo "${CONFIG}" | jq -r "
-    [
-    ${1} | to_entries[] |
-      if .value.enabled == true then
-        .key
-      else
-        empty
-      end
-    ]")"
+  possible_enabled="$(echo "${CONFIG_STRUCTURE}" | jq -r "${1}.content | keys")"
+  user_enabled="$(echo "${CONFIG}" | jq -r "[.${1} | to_entries[] | select(.value.enabled == true) .key]")"
   # Make sure the user has not "enabled" any items in their config that are not
   # actually supported, by checking against the keys in the default config.
   echo "${possible_enabled}" | jq -r ". - (. - ${user_enabled}) | .[] | tostring"
 }
 config::get() { # print the value of a key
-  if [[ "$(config::key_type "${1}")" == "array" ]]; then
+  if [[ "$(config::key_type "${1}")" == "array-string" ]]; then
     echo "${CONFIG}" | jq -r "${1} | .[] | tostring"
   else
     echo "${CONFIG}" | jq -r "${1}"
   fi
 }
 config::set() { # set the value of a key
-  config::validate_key "${1}"
+  local type value
+  type="$(config::key_type "${1}")"
+  [ $? -ne 0 ] && exit 1
 
-  if [[ "${2}" == @(?(-)+([.0-9])|true|false) ]]; then
-    local value="${2}"
-  else
-    local value="\"${2}\""
-  fi
+  case "${type}" in
+    object|array-*)
+      error "Cannot set object or array ${1}!"
+      exit 1
+      ;;
+    string)
+      value="\"${2}\""
+      ;;
+    number)
+      if [[ ${2} =~ ^[0-9]+$ ]]; then
+        value="${2}"
+      else
+        error "Wrong input for ${1}: expected number"
+        exit 1
+      fi
+      ;;
+    boolean)
+      if [[ ${2} =~ ^(true|false)$ ]]; then
+        value="${2}"
+      else
+        error "Wrong input for ${1}: expected boolean"
+        exit 1
+      fi
+      ;;
+    *)
+      error "Unexpected error: datatype ${type} for ${1} not known!"
+      exit 1
+  esac
 
-  echo "${CONFIG}" | jq "${1} = ${value}" > "${CONFIG_FILE}"
+  CONFIG="$(echo "${CONFIG}" | jq "${1} = ${value}")"
+  echo "${CONFIG}" > "${CONFIG_FILE}"
 }
 config::mod_array() { # add or remove items from a given key that is an array
-  local config="${CONFIG}"
   local mod="${1}"
   local key="${2}"
   shift 2
 
-  config::validate_key "${key}"
+  local type
+  type="$(config::key_type "${key}")"
+  [ $? -ne 0 ] && exit 1
 
-  if [[ "$(config::key_type "${key}")" == "array" ]]; then
+  if [[ "${type}" == "array-string" ]]; then
     for item in "${@}"; do
-      config="$(echo "${config}" | jq "${key} |= (. ${mod} [\"${item}\"] | unique)")"
+      CONFIG="$(echo "${CONFIG}" | jq "${key} |= (. ${mod} [\"${item}\"] | unique)")"
     done
-    echo "${config}" > "${CONFIG_FILE}"
   else
-    error "${1} is not an array."
+    error "${key} is not an array."
     exit 1
   fi
+
+  echo "${CONFIG}" > "${CONFIG_FILE}"
 }
 config::do () { # handle the 'config' command
   config::load
@@ -268,7 +322,7 @@ config::do () { # handle the 'config' command
 database::load() { # makes sure the DB file exists and is not too old
   DATABASE_FILE="$(config::get .database)"
 
-  check_file "${DATABASE_FILE}" "{}"
+  check_file "${DATABASE_FILE}" "echo {}"
   # cleanup: if the database file is older than 2 hours, consider it outdated
   # and remove its contents
   [[ -s "${DATABASE_FILE}" && $(($(date +%s)-$(cat "${DATABASE_FILE}" | jq -r '.lastcheck // 0'))) -gt 7200 ]] && database::reset
