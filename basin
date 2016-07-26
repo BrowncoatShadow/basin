@@ -180,7 +180,7 @@ config::_gen() { # recursively generate the configuration
   local first=true
   local type description default
   for key in ${keys}; do
-    if [ "${first}" == "true" ]; then
+    if [[ "${first}" == "true" ]]; then
       first=false
     else
       echo ","
@@ -207,7 +207,7 @@ config::_gen() { # recursively generate the configuration
 config::key_type() { # return the type class of a configuration key
   local path
   path="$(config::default_path "${1}")"
-  [ $? -ne 0 ] && exit 1
+  [[ $? -ne 0 ]] && exit 1
 
   echo "$(echo "${CONFIG_STRUCTURE}" | jq -r "${path}.type // null")"
 }
@@ -220,20 +220,20 @@ config::default_path() { # get the path to the specification for a key
   local no_child=false
   IFS='.' read -ra keys <<< "${1:1}"
   for child in "${keys[@]}"; do
-    if [ "${no_child}" == "true" ]; then
+    if [[ "${no_child}" == "true" ]]; then
       error "Configuration key ${1} not found!"
       exit 1
     fi
     path="${path}.${child}"
     type="$(echo "${CONFIG_STRUCTURE}" | jq -r "${path}.type // null")"
-    if [ "${type}" == "object" ]; then
+    if [[ "${type}" == "object" ]]; then
       path="${path}.content"
     else
       no_child=true
     fi
   done
 
-  if [ "${type}" == "null" ]; then
+  if [[ "${type}" == "null" ]]; then
     error "Configuration key ${1} not found!"
     exit 1
   fi
@@ -259,7 +259,7 @@ config::get() { # print the value of a key
 config::set() { # set the value of a key
   local type value
   type="$(config::key_type "${1}")"
-  [ $? -ne 0 ] && exit 1
+  [[ $? -ne 0 ]] && exit 1
 
   case "${type}" in
     object|array-*)
@@ -300,7 +300,7 @@ config::mod_array() { # add or remove items from a given key that is an array
 
   local type
   type="$(config::key_type "${key}")"
-  [ $? -ne 0 ] && exit 1
+  [[ $? -ne 0 ]] && exit 1
 
   if [[ "${type}" == "array-string" ]]; then
     for item in "${@}"; do
@@ -316,10 +316,10 @@ config::mod_array() { # add or remove items from a given key that is an array
 config::reset() { # reset a key to its default value
   local path
   path="$(config::default_path "${1}")"
-  [ $? -ne 0 ] && exit 1
+  [[ $? -ne 0 ]] && exit 1
 
   local value="$(echo "${CONFIG_STRUCTURE}" | jq -r "${path}.default")"
-  if [ -z "${value}" ]; then
+  if [[ -z "${value}" ]]; then
     error "Found no default value for ${1}!"
   else
     config::set "${1}" "${value}"
@@ -843,7 +843,7 @@ service::youtube() { # https://www.youtube.com/
 # The core functionality for basin.
 basin::help() { # be helpful
   local arg="${1}"
-  [ -z "${arg}" ] && arg=usage
+  [[ -z "${arg}" ]] && arg=usage
   case "${arg}" in
     help)
       cat <<HELP
@@ -1025,7 +1025,7 @@ basin::list() { # list live channels
 }
 basin::search() {
 
-  if [ $# -lt 2 ]
+  if [[ $# -lt 2 ]]
   then
     error 'You have to specify a category and a search parameter!'
     return 1
