@@ -250,7 +250,10 @@ config::enabled_keys() { # list services or notifiers that are enabled
   echo "${possible_enabled}" | jq -r ". - (. - ${user_enabled}) | .[] | tostring"
 }
 config::get() { # print the value of a key
-  if [[ "$(config::key_type "${1}")" == "array-string" ]]; then
+  local type
+  type="$(config::key_type "${1}")"
+  [[ $? -ne 0 ]] && exit 1
+  if [[ "${type}" == "array-string" ]]; then
     echo "${CONFIG}" | jq -r "${1} | .[] | tostring"
   else
     echo "${CONFIG}" | jq -r "${1}"
