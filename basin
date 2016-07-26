@@ -768,7 +768,9 @@ service::youtube() { # https://www.youtube.com/
 ### Basin Core
 # The core functionality for basin.
 basin::help() { # be helpful
-  case "${1}" in
+  local arg="${1}"
+  [ -z "${arg}" ] && arg=usage
+  case "${arg}" in
     help)
       cat <<HELP
 Usage:
