@@ -395,7 +395,7 @@ notifier::terminal_notifier() { # OS X Notification Center with terminal-notifie
     -appIcon "${service_logo}" \
     -contentImage "${logo}" \
     -open "${url}" \
-    >/dev/null # silently fail instead of printing Useage
+    >/dev/null # silently fail instead of printing Usage
 }
 notifier::pushbullet() { # notify by PushBullet API notification
   local pushbullet_token pushbullet_targets
@@ -771,19 +771,19 @@ basin::help() { # be helpful
   case "${1}" in
     help)
       cat <<HELP
-Useage:
+Usage:
   basin help [command]
 
 Description:
   Help will describe commands and how they can be used.
 
 See Also:
-  useage
+  usage
 HELP
       ;;
     config)
       cat <<CONFIG
-Useage:
+Usage:
   basin config <action> [key] [value]
 
 Description:
@@ -803,7 +803,7 @@ CONFIG
       ;;
     check)
       cat <<CHECK
-Useage:
+Usage:
   basin check
 
 Description:
@@ -815,7 +815,7 @@ CHECK
       ;;
     list)
       cat <<LIST
-Useage:
+Usage:
   basin [-j] list
 
 Description:
@@ -825,7 +825,7 @@ LIST
       ;;
     tui)
       cat <<TUI
-Useage:
+Usage:
   basin tui
 
 Description:
@@ -838,7 +838,7 @@ TUI
       ;;
     search)
       cat <<SEARCH
-Useage:
+Usage:
   basin search game "<name>" ["<name>"...]
   basin search status "<string>" ["<string>"...]
 
@@ -855,7 +855,7 @@ SEARCH
       ;;
     reset)
       cat <<RESET
-Useage:
+Usage:
   basin reset
 
 Description:
@@ -865,7 +865,7 @@ RESET
       ;;
     start)
       cat <<START
-Useage:
+Usage:
   basin start [minutes]
 
 Description:
@@ -879,7 +879,7 @@ START
       ;;
     stop)
       cat <<STOP
-Useage:
+Usage:
   basin stop
 
 Description:
@@ -891,7 +891,7 @@ STOP
       ;;
     status)
       cat <<STATUS
-Useage:
+Usage:
   basin status
 
 Description:
@@ -904,9 +904,9 @@ See Also:
   start, stop
 STATUS
       ;;
-    useage)
-      cat <<USEAGE
-Useage:
+    usage)
+      cat <<USAGE
+Usage:
   basin [options] command [subcommands]
 
 Options:
@@ -914,8 +914,8 @@ Options:
   -j              Use JSON instead of raw text output if applicable to the command.
 
 Commands:
-  help, useage, config, check, list, tui, reset, search, start, stop, status
-USEAGE
+  help, usage, config, check, list, tui, reset, search, start, stop, status
+USAGE
       ;;
     *) echo "No help entry for: ${1}" ;;
   esac
@@ -1168,7 +1168,7 @@ main() {
     case ${opt} in
       c) ALT_CONFIG="${OPTARG}" ;;
       j) OUTPUT_JSON="true" ;;
-      h) basin::help useage; exit 0 ;;
+      h) basin::help usage; exit 0 ;;
       \?) error "Invalid option: -${OPTARG}"; exit 1 ;;
       :) error "-${OPTARG} requires an argument."; exit 1 ;;
     esac
@@ -1186,7 +1186,7 @@ main() {
     stop) crontab::stop ;;
     status) crontab::status ;;
     help) shift; basin::help "${@}" ;;
-    *|useage) basin::help useage ;;
+    *|usage) basin::help usage ;;
   esac
 }
 main "${@}"
