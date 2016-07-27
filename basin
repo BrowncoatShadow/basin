@@ -6,52 +6,6 @@ shopt -s extglob
 
 # Initial default configuration.
 CONFIG_FILE="${HOME}/.config/basin.json"
-CONFIG_STRUCTURE='{
-  "check_interval": { "type": "number", "default": 1, "description": "How often basin runs the online check (in minutes) when installed via cron" },
-  "database": { "type": "string", "default": "'"${HOME}"'/.local/share/basin/online.json" },
-  "service": { "type": "object", "description": "Configure the service providers", "content": {
-    "twitch": { "type": "object", "description": "Configure Twitch", "content": {
-      "enabled": { "type": "boolean", "default": false, "description": "Whether this service gets called at all" },
-      "client_id": { "type": "string", "default": "", "description": "A Twitch API Client-ID is required for all calls to the Twitch API. Generate it at < https://www.twitch.tv/kraken/oauth2/clients/new >." },
-      "user": { "type": "string", "default": "", "description": "Your username on Twitch. basin will get the list of your followed channels and check these." },
-      "follow": { "type": "array-string", "default": [], "description": "A list of Twitch channels to follow" }
-    } },
-    "hitbox": { "type": "object", "description": "Configure Hitbox", "content": {
-      "enabled": { "type": "boolean", "default": false, "description": "Whether this service gets called at all" },
-      "user": { "type": "string", "default": "", "description": "Your username on Hitbox. basin will get the list of your followed channels and check these." },
-      "follow": { "type": "array-string", "default": [], "description": "A list of Hitbox channels to follow" }
-    } },
-    "azubu": { "type": "object", "description": "Configure Azubu", "content": {
-      "enabled": { "type": "boolean", "default": false, "description": "Whether this service gets called at all" },
-      "follow": { "type": "array-string", "default": [], "description": "A list of Azubu channels to follow" }
-    } },
-    "periscope": { "type": "object", "description": "Configure Periscope", "content": {
-      "enabled": { "type": "boolean", "default": false, "description": "Whether this service gets called at all" },
-      "follow": { "type": "array-string", "default": [], "description": "A list of Periscope channels to follow" }
-    } },
-    "youtube": { "type": "object", "description": "Configure YouTube", "content": {
-      "enabled": { "type": "boolean", "default": false, "description": "Whether this service gets called at all" },
-      "key": { "type": "string", "default": "", "description": "A YouTube API key is required for all calls to the YouTube API." },
-      "follow": { "type": "array-string", "default": [], "description": "A list of YouTube channels to follow" }
-    } }
-  } },
-  "notifier": { "type": "object", "description": "Configure notifier modules", "content": {
-    "pushbullet": { "type": "object", "description": "Configure PushBullet", "content": {
-      "enabled": { "type": "boolean", "default": false, "description": "Whether this notifier gets called" },
-      "token": { "type": "string", "default": "", "description":  "Your PushBullet token" },
-      "target": { "type": "array-string", "default": [], "description": "A list of targets to push the notification to" }
-    } },
-    "kdialog": { "type": "object", "description": "Configure KDialog (Plasma) notifications", "content": {
-      "enabled": { "type": "boolean", "default": false, "description": "Whether this notifier gets called" }
-    } },
-    "osx": { "type": "object", "description": "Configure OSX notifications", "content": {
-      "enabled": { "type": "boolean", "default": false, "description": "Whether this notifier gets called" }
-    } },
-    "terminal_notifier": { "type": "object", "description": "Configure terminal notifier", "content": {
-      "enabled": { "type": "boolean", "default": false, "description": "Whether this notifier gets called" }
-    } }
-  } }
-}'
 
 ### Helper Functions
 check_system() { # platform specific fixes and function definitions
@@ -62,13 +16,16 @@ check_system() { # platform specific fixes and function definitions
     PATH=${PATH}:/usr/local/bin
     # helper for interactive mode, returns the given time using system's `date`
     system_date() { echo "$(date -jf %s "${1}" "+%H:%M"))"; }
+    system_browser() { echo "open"; }
   elif [[ "${system_type}" == "Linux" ]]; then # Linux
     system_date() { echo "$(date --date="@${1}" "+%H:%M"))"; }
+    system_browser() { echo "xdg-open"; }
   else # unknown system
     error "${system_type} is not supported."
     exit 1
   fi
 }
+
 error() { # print a colorful message to STDERR
   local red='\033[0;31m'
   local nc='\033[0m'
@@ -163,6 +120,54 @@ crontab::stop() { # remove basin's crontab entry
 ### Config
 # Functions that manage configuration.
 config::load() { # load the configuration and create it if it does not exist
+  check_system
+  CONFIG_STRUCTURE='{
+    "check_interval": { "type": "number", "default": 1, "description": "How often basin runs the online check (in minutes) when installed via cron" },
+    "database": { "type": "string", "default": "'"${HOME}"'/.local/share/basin/online.json" },
+    "browser": { "type": "string", "default": "'"$(system_browser)"'" },
+    "service": { "type": "object", "description": "Configure the service providers", "content": {
+      "twitch": { "type": "object", "description": "Configure Twitch", "content": {
+        "enabled": { "type": "boolean", "default": false, "description": "Whether this service gets called at all" },
+        "client_id": { "type": "string", "default": "", "description": "A Twitch API Client-ID is required for all calls to the Twitch API. Generate it at < https://www.twitch.tv/kraken/oauth2/clients/new >." },
+        "user": { "type": "string", "default": "", "description": "Your username on Twitch. basin will get the list of your followed channels and check these." },
+        "follow": { "type": "array-string", "default": [], "description": "A list of Twitch channels to follow" }
+      } },
+      "hitbox": { "type": "object", "description": "Configure Hitbox", "content": {
+        "enabled": { "type": "boolean", "default": false, "description": "Whether this service gets called at all" },
+        "user": { "type": "string", "default": "", "description": "Your username on Hitbox. basin will get the list of your followed channels and check these." },
+        "follow": { "type": "array-string", "default": [], "description": "A list of Hitbox channels to follow" }
+      } },
+      "azubu": { "type": "object", "description": "Configure Azubu", "content": {
+        "enabled": { "type": "boolean", "default": false, "description": "Whether this service gets called at all" },
+        "follow": { "type": "array-string", "default": [], "description": "A list of Azubu channels to follow" }
+      } },
+      "periscope": { "type": "object", "description": "Configure Periscope", "content": {
+        "enabled": { "type": "boolean", "default": false, "description": "Whether this service gets called at all" },
+        "follow": { "type": "array-string", "default": [], "description": "A list of Periscope channels to follow" }
+      } },
+      "youtube": { "type": "object", "description": "Configure YouTube", "content": {
+        "enabled": { "type": "boolean", "default": false, "description": "Whether this service gets called at all" },
+        "key": { "type": "string", "default": "", "description": "A YouTube API key is required for all calls to the YouTube API." },
+        "follow": { "type": "array-string", "default": [], "description": "A list of YouTube channels to follow" }
+      } }
+    } },
+    "notifier": { "type": "object", "description": "Configure notifier modules", "content": {
+      "pushbullet": { "type": "object", "description": "Configure PushBullet", "content": {
+        "enabled": { "type": "boolean", "default": false, "description": "Whether this notifier gets called" },
+        "token": { "type": "string", "default": "", "description":  "Your PushBullet token" },
+        "target": { "type": "array-string", "default": [], "description": "A list of targets to push the notification to" }
+      } },
+      "kdialog": { "type": "object", "description": "Configure KDialog (Plasma) notifications", "content": {
+        "enabled": { "type": "boolean", "default": false, "description": "Whether this notifier gets called" }
+      } },
+      "osx": { "type": "object", "description": "Configure OSX notifications", "content": {
+        "enabled": { "type": "boolean", "default": false, "description": "Whether this notifier gets called" }
+      } },
+      "terminal_notifier": { "type": "object", "description": "Configure terminal notifier", "content": {
+        "enabled": { "type": "boolean", "default": false, "description": "Whether this notifier gets called" }
+      } }
+    } }
+  }'
   if [[ "${ALT_CONFIG}" ]]; then
     CONFIG_FILE="${ALT_CONFIG}"
   fi
