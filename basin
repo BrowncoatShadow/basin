@@ -406,24 +406,19 @@ database::reset() { # wipes the database clean
   echo "{}" > "${DATABASE_FILE}"
 }
 database::print_formatted() { # pretty-prints the database
-  echo -e "$(cat "${DATABASE_FILE}" | jq -r '
-    (.online // [])[] |
-      [
-        "\n\\033[1;34m", .display_name, "\\033[0m",
-        (
-          # Properly align the game for shorter channel names
-          .display_name | length |
-          if . < 8 then
-            "\t\t"
-          else
-            "\t"
-          end
-        ),
-        "\\033[0;36m", .game, "\\033[0m",
-        "\n\\033[0;32m", .url, "\\033[0m",
-      "\n", .status
-      ] |
-    add')"
+  local streams
+  IFS=$'\n' streams=($(cat "${DATABASE_FILE}" | jq -c '(.online // [])[]'))
+  local index display_name game url status
+  local i=0
+  for stream in "${streams[@]}"; do
+    i=$((i+1))
+    [[ "${1}" == "interactive" ]] && index="[${i}] "
+    display_name="$(echo "${stream}" | jq -r '.display_name')"
+    game="$(echo "${stream}" | jq -r '.game')"
+    url="$(echo "${stream}" | jq -r '.url')"
+    status="$(echo "${stream}" | jq -r '.status')"
+    printf "\n%s\e[1;34m%-20s\e[0;36m%s\n\e[0;32m%s\e[0m\n%s\n" "${index}" "${display_name}" "${game}" "${url}" "${status}"
+  done
 }
 
 ### Notifier Plugins
@@ -1215,7 +1210,7 @@ basin::tui() { # display DB items using a text-based user interface
       echo "[press q to exit]"
 
       # pretty-print the database json
-      database::print_formatted
+      database::print_formatted interactive
       echo
     fi
   }
@@ -1237,7 +1232,29 @@ basin::tui() { # display DB items using a text-based user interface
 
   local keypress=''
   # run the loop until [q] is pressed
-  while [[ "${keypress}" != "q" ]]; do
+  while true
+  do
+    case "${keypress}" in
+      q)
+        break
+        ;;
+      [1-9])
+        local streams url
+        IFS=$'\n' streams=($(cat "${DATABASE_FILE}" | jq -c '(.online // [])[]'))
+        local i=0
+        for stream in "${streams[@]}"; do
+          i=$((i+1))
+          if [[ ${i} -eq ${keypress} ]]; then
+            url="$(echo "${stream}" | jq -r '.url')"
+            break
+          fi
+        done
+        $(config::get .browser) ${url} > /dev/null &
+        tui_display
+        echo "Started browser"
+        ;;
+    esac
+
     # we need some kind of timeout so we don't waste cpu time
     sleep 0.4
     # make sure to only update every ten seconds
