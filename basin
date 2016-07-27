@@ -168,6 +168,10 @@ config::load() { # load the configuration and create it if it does not exist
   fi
   check_file "${CONFIG_FILE}" "config::generate"
   CONFIG="$(cat "${CONFIG_FILE}")"
+  # make sure .service and .notifiers exist in our cached variable at least
+  if echo "${CONFIG}" | jq -e '.service == null' >/dev/null; then
+    CONFIG="$(echo "${CONFIG}" | jq '.service = {} | .notifiers = {}')"
+  fi
 }
 config::generate() { # generate a blank configuration
   config::_gen "${CONFIG_STRUCTURE}" | jq '.'
