@@ -212,11 +212,11 @@ config::key_type() { # return the type class of a configuration key
   echo "$(echo "${CONFIG_STRUCTURE}" | jq -r "${path}.type // null")"
 }
 config::default_path() { # get the path to the specification for a key
-  if [[ -z "${1}" ]]; then
+  if [[ -z "${1}" || "${1}" == "." ]]; then
     return # no value given
   fi
 
-  local path type
+  local path type content
   local no_child=false
   IFS='.' read -ra keys <<< "${1:1}"
   for child in "${keys[@]}"; do
@@ -224,10 +224,10 @@ config::default_path() { # get the path to the specification for a key
       error "Configuration key ${1} not found!"
       exit 1
     fi
-    path="${path}.${child}"
+    path="${path}${content}.${child}"
     type="$(echo "${CONFIG_STRUCTURE}" | jq -r "${path}.type // null")"
     if [[ "${type}" == "object" ]]; then
-      path="${path}.content"
+      content=".content"
     else
       no_child=true
     fi
