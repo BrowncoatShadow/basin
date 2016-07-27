@@ -348,6 +348,7 @@ config::do () { # handle the 'config' command
     add) shift; config::mod_array + "${@}" ;;
     remove) shift; config::mod_array - "${@}" ;;
     reset) shift; config::reset "${@}" ;;
+    edit) basin::config_tui ;;
     *) error "${1} is not a supported config action."; exit 1 ;;
   esac
 }
@@ -892,6 +893,8 @@ Actions:
         Adds the given value to the key which is an array.
   remove <key> <value>
         Removes the given value from the key which is an array.
+  edit
+        Opens an interactive menu to edit the current configuration
 CONFIG
       ;;
     check)
@@ -1247,6 +1250,236 @@ basin::tui() { # display DB items using a text-based user interface
     # handle ctrl-c (SIGINT) gracefully and restore the proper prompt
     trap tui_cleanup SIGINT
   done
+
+  # reset and exit
+  tui_cleanup
+}
+basin::config_tui() { # text-based interface for config manipulation
+  tui_cleanup() { # exit interactive mode gracefully
+    # revert black magic, exit the screen and recover old cursor position
+    stty sane
+    # exit the screen and recover old cursor position at this point, all changes
+    # done by our script should be reverted
+    tput rmcup
+  }
+
+  tui_display() { # generate the output for the interactive menu
+
+    local path=
+    local description keys type
+
+    # if 'true', the menu will get repainted before asking for an input
+    local skip_read
+
+    print_menu() {
+      tput clear
+
+      type="$(config::key_type "${path}")"
+      [[ $? -ne 0 ]] && exit 1
+
+      local dpath key_type key_value key_char
+      # holds the path to the specification of the current element
+      dpath="$(config::default_path "${path}")"
+      if [[ -z "${path}" ]]; then # root
+        printf "\tConfigure basin\n\n\n\n"
+        type=object
+        keys=($(echo "${CONFIG_STRUCTURE}" | jq -r "keys[]"))
+      else
+        description="$(echo "${CONFIG_STRUCTURE}" | jq -r "${dpath} | .description")"
+        dpath="${dpath}.content"
+        printf "\t${description}\n${path}\n\n"
+        keys=
+      fi
+
+      case "${type}" in
+      object)
+        # if we're not at root, we can go deeper
+        [[ -n "${path}" ]] && echo "[0]  .."
+        local i=0
+        # get sub keys
+        [[ -z "${keys}" ]] && keys=($(echo "${CONFIG_STRUCTURE}" | jq -r "${dpath} | keys[]"))
+        for key in "${keys[@]}"; do
+          i=$((i+1))
+          key_type="$(echo "${CONFIG_STRUCTURE}" | jq -r "${dpath}.${key}.type")"
+          if [[ "${key_type}" == "object" ]]; then
+            key_char="#"
+            key_value=
+          elif [[ "${key_type}" =~ ^array- ]]; then
+            key_char="@"
+            key_value=
+          else
+            key_char=
+            key_value="$(config::get "${path}.${key}")"
+          fi
+          # NOTE if we ever get more than 9 entries for a level, this formatting will fail.
+          printf '[%d] %1s.%-20s%-15s%s\n' ${i} "${key_char}" "${key}" "${key_type}" "${key_value}"
+        done
+        ;;
+
+      array-string)
+        echo "[0]  .."
+
+        local entries
+        IFS=$'\n' entries=($(config::get "${path}"))
+        echo
+        echo -n "     Current entries:"
+        c=
+        for entry in "${entries[@]}"; do
+          echo -n "${c} ${entry}"
+          c=,
+        done
+        echo
+        echo
+        echo "[a]  add entry"
+        echo "[r]  remove entry"
+        echo "[q]  quit"
+        echo
+        echo -n "> "
+        read action
+        case "${action}" in
+          \.\.|0)
+            path="${path%.*}"
+            ;;
+          a)
+            echo -n "New entry: "
+            read entry
+            config::mod_array + "${path}" "${entry}"
+            ;;
+          r)
+            tput clear
+            printf "\t${description}\n${path}\n\n"
+            echo "[ 0] cancel"
+            local i=0
+            for entry in "${entries[@]}"; do
+              i=$((i+1))
+              printf '[%2d] %s\n' ${i} "${entry}"
+            done
+            echo
+            echo -n "Remove: "
+            read remove
+            # 0 means exit
+            if [[ ${remove} != 0 ]]; then
+              # number?
+              if [[ ${remove} =~ ^[0-9]+$ ]]; then
+                # number not too high?
+                if [[ ${#entries[@]} -ge ${remove} ]]; then
+                  # remove the n'th entry
+                  config::mod_array - "${path}" "${entries[${remove}-1]}"
+                fi
+              else
+                # no number, search for string equality
+                for entry in "${entries[@]}"; do
+                  if [[ "${entry}" == "${remove}" ]]; then
+                    config::mod_array - "${path}" "${remove}"
+                    break
+                  fi
+                done
+              fi
+            fi
+            ;;
+          q)
+            exit 0
+            ;;
+        esac
+
+        # skip reading input
+        skip_read=true
+        return
+
+        ;;
+
+      boolean|number|string)
+        value="$(config::get "${path}")"
+        echo "Current value: ${value}"
+        echo -n "Change (y/N)?  "
+        read do_change
+        if [[ "$do_change" =~ (y|Y) ]]; then
+          local new_value
+          # boolean will be flipped
+          if [[ "${type}" == "boolean" ]]; then
+            [[ "${value}" == "true" ]] && new_value="false" || new_value="true"
+          else
+            while [[ -z "${new_value}" ]]; do
+              echo -n "New value:     "
+              read new_value
+              if [[ "${type}" == "number" ]]; then
+                if ! [[ "${new_value}" =~ ^[0-9]+$ ]]; then
+                  error "The input was not a number!"
+                  new_value=
+                fi
+              fi
+            done
+          fi
+          config::set "${path}" "${new_value}"
+        else
+          # If we do not change this value, go back up one level
+          path="${path%.*}"
+        fi
+        # skip reading input
+        skip_read=true
+        return
+        ;;
+
+      *)
+        error "Unknown datatype, cannot change!"
+      esac
+
+      echo
+      echo "[q] exit"
+      echo
+
+    }
+
+    while true
+    do
+      skip_read=false
+      print_menu
+
+      [[ "${skip_read}" == "true" ]] && continue;
+
+      # If we don't skip it, read a choice
+      echo -n "> "
+      read do_next
+      case "${do_next}" in
+
+      # .. or 0 go back a level if possible
+      \.\.|0)
+        path="${path%.*}"
+        ;;
+
+      # Any other numbers select a key by index.
+      [0-9]*)
+        [[ ${#keys[@]} -ge ${do_next} ]] && path="${path}.${keys[${do_next}-1]}"
+        ;;
+
+      # Any string starting with . gets read as an index.
+      # If this index exists on this level, we select it.
+      \.*)
+        for k in "${keys[@]}"; do
+          if [[ "${k}" == "${do_next:1}" ]]; then
+            path="${path}${do_next}"
+            break
+          fi
+        done
+        ;;
+
+      # q exits the program.
+      q)
+        return 0
+        ;;
+
+      esac
+    done
+  }
+
+  # saves current position of the cursor, and opens new screen
+  tput smcup
+
+  # handle ctrl-c (SIGINT) gracefully and restore the proper prompt
+  trap tui_cleanup SIGINT
+
+  # let's start displaying our data
+  tui_display
 
   # reset and exit
   tui_cleanup
