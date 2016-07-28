@@ -263,7 +263,8 @@ config::get() { # print the value of a key
   type="$(config::key_type "${1}")"
   [[ $? -ne 0 ]] && exit 1
   if [[ "${type}" == "array-string" ]]; then
-    value="$(echo "${CONFIG}" | jq -r "${1} | .[] | tostring")"
+    value="$(echo "${CONFIG}" | jq -r "${1} | .[] | tostring" 2>/dev/null)"
+    [[ $? -ne 0 ]] && value=null # couldn't read value
   else
     value="$(echo "${CONFIG}" | jq -r "${1}")"
   fi
