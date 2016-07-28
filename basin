@@ -58,6 +58,74 @@ playing_check() { # return null if given game is null, return given "playing" st
     echo "${2}"
   fi
 }
+filter() { # uses the configured filters on the given objects
+  local service="${1}"
+  local name="${2}"
+  local game="${3}"
+  local status="${4}"
+
+  [[ -z "${name}" ]] && return 0
+  [[ -z "${game}" && -z "${status}" ]] && return 0
+
+  local cfilters="$(config::get ".filter")"
+  local is_whitelisted is_blacklisted is_silent is_notsilent
+  local filters
+  readarray filters <<< "$(echo "${cfilters}" | jq -c '.[]')"
+  for filter in "${filters[@]}"
+  do
+    local fservice="$(echo "${filter}" | jq -r '.service // empty')"
+    local fname="$(echo "${filter}" | jq -r '.name // empty')"
+    local fgame="$(echo "${filter}" | jq -r '.game // empty')"
+    local fstatus="$(echo "${filter}" | jq -r '.status // empty')"
+    local fwhitelist="$(echo "${filter}" | jq -r '.whitelist // false')"
+    local fsilent="$(echo "${filter}" | jq -r '.silent // false')"
+    # if nothing is set for this filter (empty filter), ignore it.
+    [[ -z "${fservice}" && -z "${fname}" && -z "${fgame}" && -z "${fstatus}" ]] && continue
+    # if any part of the filter does not match, we're out.
+    local matched=1
+    if [[ -n "${fservice}" ]]; then
+      [[ "${service}" =~ ${fservice} ]] || matched=0
+    fi
+    if [[ -n "${fname}" && ${matched} -eq 1 ]]; then
+      [[ "${name}" =~ ${fname} ]] || matched=0
+    fi
+    if [[ -n "${fgame}" && ${matched} -eq 1 ]]; then
+      [[ "${game}" =~ ${fgame} ]] || matched=0
+    fi
+    if [[ -n "${fstatus}" && ${matched} -eq 1 ]]; then
+      [[ "${status}" =~ ${fstatus} ]] || matched=0
+    fi
+    # Did we have a match?
+    if [[ ${matched} -eq 1 ]]; then
+      # Just silent the stream or filter it completely?
+      if [[ "${fsilent}" == "true" ]]; then
+        if [[ "${fwhitelist}" == "true" ]]; then
+          is_notsilent=true
+        else
+          is_silent=true
+        fi
+      else
+        if [[ "${fwhitelist}" == "true" ]]; then
+          is_whitelisted=true
+        else
+          is_blacklisted=true
+        fi
+      fi
+    fi
+  done
+  # The priority is: silent (-1), whitelisted (0), blacklisted (1), others (0)
+  # However, silent must not be "notsilent" (whitelist on silent filter).
+  # This means that whitelisted streams can still be silenced and need an
+  # additional filter.
+  if [[ "${is_silent}" == "true" && "${is_notsilent}" != "true" ]]; then
+    return -1
+  elif [[ "${is_whitelisted}" == "true" ]]; then
+    return 0
+  elif [[ "${is_blacklisted}" == "true" ]]; then
+    return 1
+  fi
+  return 0
+}
 preflight() { # handles all common tasks that should be taken before normal operations
   check_system
   config::load
@@ -151,6 +219,14 @@ config::load() { # load the configuration and create it if it does not exist
         "follow": { "type": "array-string", "default": [], "description": "A list of YouTube channels to follow" }
       } }
     } },
+    "filter": { "type": "array-object", "default": [], "description": "A list of filters which streams to handle differently", "content": {
+      "service": { "type": "string", "default": "", "description": "A regexp matching the services for which this filter is active" },
+      "name": { "type": "string", "default": "", "description": "A regexp matching the channel name for which this filter is active" },
+      "game": { "type": "string", "default": "", "description": "A regexp matching the game for which this filter is active" },
+      "status": { "type": "string", "default": "", "description": "A regexp matching the status for which this filter is active" },
+      "whitelist": { "type": "boolean", "default": "false", "description": "This filter acts as a whitelist, overriding any other filters" },
+      "silent": { "type": "boolean", "default": "false", "description": "Instead of filtering out matched streams, still add them to the database but do not call notifiers" }
+    } },
     "notifier": { "type": "object", "description": "Configure notifier modules", "content": {
       "pushbullet": { "type": "object", "description": "Configure PushBullet", "content": {
         "enabled": { "type": "boolean", "default": false, "description": "Whether this notifier gets called" },
@@ -175,7 +251,7 @@ config::load() { # load the configuration and create it if it does not exist
   CONFIG="$(cat "${CONFIG_FILE}")"
   # make sure .service and .notifiers exist in our cached variable at least
   if echo "${CONFIG}" | jq -e '.service == null' >/dev/null; then
-    CONFIG="$(echo "${CONFIG}" | jq '.service = {} | .notifiers = {}')"
+    CONFIG="$(echo "${CONFIG}" | jq '.service = {} | .notifier = {} | .filter = {}')"
   fi
 }
 config::generate() { # generate a blank configuration
@@ -621,8 +697,18 @@ service::twitch() { # https://www.twitch.tv/
       continue
     fi
 
-    # if result is not broken, send it to notifier gateway
-    basin::notify "${new_online_json}" "${channel}"
+    # if result is not broken, send it to notifier gateway if it passes the filters
+    filter "Twitch" "${channel}" "${check_game}" "${check_status}"
+    # result can be -1, 0 and 1. -1 means no notification, 0 means normal, 1 means ignore completely.
+    local ret=$?
+
+    if [[ ${ret} -eq 1 ]]; then
+      # remove entry
+      new_online_json="$(echo "${new_online_json}" | jq "del(.[] | select(.name==\"${channel}\"))")"
+    elif [[ ${ret} -eq 0 ]]; then
+      basin::notify "${new_online_json}" "${channel}"
+    fi
+
   done
 
   database::include "${new_online_json}"
@@ -692,7 +778,17 @@ service::hitbox() { # http://www.hitbox.tv/
 
   # notify for new streams
   for channel in ${hitbox_list}; do
-    basin::notify "${new_online_json}" ${channel,,}
+    local game="$(json_get "${new_online_json}" "${channel}" 'game')"
+    local status="$(json_get "${new_online_json}" "${channel}" 'status')"
+    filter "Hitbox" "${channel}" "${game}" "${status}"
+    # result can be -1, 0 and 1. -1 means no notification, 0 means normal, 1 means ignore completely.
+    local ret=$?
+    if [[ ${ret} -eq 1 ]]; then
+      # remove entry
+      new_online_json="$(echo "${new_online_json}" | jq "del(.[] | select(.name==\"${channel}\"))")"
+    elif [[ ${ret} -eq 0 ]]; then
+      basin::notify "${new_online_json}" "${channel,,}"
+    fi
   done
 
   database::include "${new_online_json}"
@@ -738,7 +834,17 @@ service::azubu() { # http://www.azubu.tv/
 
   # notify for new streams
   for channel in ${azubu_list}; do
-    basin::notify "${new_online_json}" ${channel}
+    local game="$(json_get "${new_online_json}" "${channel}" 'game')"
+    local status="$(json_get "${new_online_json}" "${channel}" 'status')"
+    filter "Azubu" "${channel}" "${game}" "${status}"
+    # result can be -1, 0 and 1. -1 means no notification, 0 means normal, 1 means ignore completely.
+    local ret=$?
+    if [[ ${ret} -eq 1 ]]; then
+      # remove entry
+      new_online_json="$(echo "${new_online_json}" | jq "del(.[] | select(.name==\"${channel}\"))")"
+    elif [[ ${ret} -eq 0 ]]; then
+      basin::notify "${new_online_json}" "${channel}"
+    fi
   done
 
   database::include "${new_online_json}"
@@ -796,7 +902,17 @@ service::periscope() { # https://www.periscope.tv/
 
   # notify for new streams
   for channel in ${periscope_follow}; do
-    basin::notify "${new_online_json}" ${channel}
+    local game="$(json_get "${new_online_json}" "${channel}" 'game')"
+    local status="$(json_get "${new_online_json}" "${channel}" 'status')"
+    filter "Periscope" "${channel}" "${game}" "${status}"
+    # result can be -1, 0 and 1. -1 means no notification, 0 means normal, 1 means ignore completely.
+    local ret=$?
+    if [[ ${ret} -eq 1 ]]; then
+      # remove entry
+      new_online_json="$(echo "${new_online_json}" | jq "del(.[] | select(.name==\"${channel}\"))")"
+    elif [[ ${ret} -eq 0 ]]; then
+      basin::notify "${new_online_json}" "${channel}"
+    fi
   done
 
   database::include "${new_online_json}"
@@ -859,7 +975,17 @@ service::youtube() { # https://www.youtube.com/
 
   # notify for new streams
   for channel in ${youtube_follow}; do
-    basin::notify "${new_online_json}" ${channel}
+    local game="$(json_get "${new_online_json}" "${channel}" 'game')"
+    local status="$(json_get "${new_online_json}" "${channel}" 'status')"
+    filter "YouTube" "${channel}" "${game}" "${status}"
+    # result can be -1, 0 and 1. -1 means no notification, 0 means normal, 1 means ignore completely.
+    local ret=$?
+    if [[ ${ret} -eq 1 ]]; then
+      # remove entry
+      new_online_json="$(echo "${new_online_json}" | jq "del(.[] | select(.name==\"${channel}\"))")"
+    elif [[ ${ret} -eq 0 ]]; then
+      basin::notify "${new_online_json}" "${channel}"
+    fi
   done
 
   database::include "${new_online_json}"
