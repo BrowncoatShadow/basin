@@ -270,8 +270,13 @@ config::get() { # print the value of a key
 
   if [[ "${value}" == "null" ]]; then
     local default_value="$(echo "${CONFIG_STRUCTURE}" | jq -r "$(config::default_path "${1}").default // null")"
-    config::set "${1}" "${default_value}"
-    config::get "${1}"
+    if [[ -n "${default_value}" ]]; then
+      config::set "${1}" "${default_value}" force
+      config::get "${1}"
+    else
+      error "Could not retrieve value for '${1}'!"
+      exit 1
+    fi
   else
     echo "${value}"
   fi
@@ -283,8 +288,12 @@ config::set() { # set the value of a key
 
   case "${type}" in
     object|array-*)
-      error "Cannot set object or array ${1}!"
-      exit 1
+      if [[ "${3}" == "force" ]]; then
+        value="${2}"
+      else
+        error "Cannot set object or array ${1}!"
+        exit 1
+      fi
       ;;
     string)
       value="\"${2}\""
