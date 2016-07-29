@@ -192,7 +192,7 @@ config::load() { # load the configuration and create it if it does not exist
   CONFIG_STRUCTURE='{
     "check_interval": { "type": "number", "default": 1, "description": "How often basin runs the online check (in minutes) when installed via cron" },
     "database": { "type": "string", "default": "'"${HOME}"'/.local/share/basin/online.json", "description": "The storage location of the database." },
-    "browser": { "type": "string", "default": "'"$(system_browser)"'", "Set the browser that should be called when opening streams." },
+    "browser": { "type": "string", "default": "'"$(system_browser)"'", "description": "Set the browser that should be called when opening streams." },
     "service": { "type": "object", "description": "Configure the service providers", "content": {
       "twitch": { "type": "object", "description": "Configure Twitch", "content": {
         "enabled": { "type": "boolean", "default": false, "description": "Whether this service gets called at all" },
