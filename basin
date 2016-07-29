@@ -242,6 +242,10 @@ config::load() { # load the configuration and create it if it does not exist
       "terminal_notifier": { "type": "object", "description": "Configure terminal notifier", "content": {
         "enabled": { "type": "boolean", "default": false, "description": "Whether this notifier gets called" }
       } }
+    } },
+    "search": { "type": "object", "description": "Configure search", "content": {
+      "twitch": { "type": "boolean", "default": true, "description": "Enable searching on Twitch" },
+      "hitbox": { "type": "boolean", "default": true, "description": "Enable searching on Hitbox" }
     } }
   }'
   if [[ "${ALT_CONFIG}" ]]; then
@@ -1179,6 +1183,8 @@ basin::list() { # list live channels
 }
 basin::search() {
 
+  config::load
+
   if [[ $# -lt 2 ]]
   then
     error 'You have to specify a category and a search parameter!'
@@ -1189,29 +1195,36 @@ basin::search() {
 
   shift
 
-  local returned_data_twitch
-  local returned_data_hitbox
+  local returned_data_twitch returned_data_hitbox
+  local enabled_twitch enabled_hitbox
+  enabled_twitch=$(config::get .search.twitch)
+  enabled_hitbox=$(config::get .search.hitbox)
+
+  if [[ "${enabled_hitbox}" != "true" && "${enabled_twitch}" != "true" ]]; then
+    error 'No services are set to be searched. Please update your configuration.'
+    return 1
+  fi
 
   for arg
   do
     case ${type} in
       game)
-        returned_data_twitch="$(curl -s \
+        [[ "${enabled_twitch}" == "true" ]] && returned_data_twitch="$(curl -s \
           --header 'Client-ID: '${CLIENT} \
           -H 'Accept: application/vnd.twitchtv.v3+json' \
           --data-urlencode "game=${arg}" \
           -G "https://api.twitch.tv/kraken/streams?limit=10")"
-        returned_data_hitbox="$(curl -s \
+        [[ "${enabled_hitbox}" == "true" ]] && returned_data_hitbox="$(curl -s \
           --data-urlencode "game=${arg}" \
           -G "https://api.hitbox.tv/media/live/list?limit=10")"
         ;;
       status)
-        returned_data_twitch="$(curl -s \
+        [[ "${enabled_twitch}" == "true" ]] && returned_data_twitch="$(curl -s \
           --header 'Client-ID: '${CLIENT} \
           -H 'Accept: application/vnd.twitchtv.v3+json' \
           --data-urlencode "query=\"${arg}\"" \
           -G "https://api.twitch.tv/kraken/search/streams?limit=10")"
-        returned_data_hitbox="$(curl -s \
+        [[ "${enabled_hitbox}" == "true" ]] && returned_data_hitbox="$(curl -s \
           --data-urlencode "search=${arg}" \
           -G "https://api.hitbox.tv/media/live/list?limit=10")"
         ;;
@@ -1220,10 +1233,10 @@ basin::search() {
         return 1
     esac
 
-    local json_twitch
-    local json_hitbox
+    local json_twitch='[]'
+    local json_hitbox='[]'
     local json
-    json_twitch="$(echo "${returned_data_twitch}" | jq -r '[
+    [[ "${enabled_twitch}" == "true" ]] && json_twitch="$(echo "${returned_data_twitch}" | jq -r '[
       .streams[] |
       {
         service: "Twitch",
@@ -1237,7 +1250,7 @@ basin::search() {
         viewers: .viewers
       }
     ]')"
-    json_hitbox="$(echo "${returned_data_hitbox}" | jq -r '[
+    [[ "${enabled_hitbox}" == "true" ]] && json_hitbox="$(echo "${returned_data_hitbox}" | jq -r '[
       .livestream[] |
       {
         service: "Hitbox",
