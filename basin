@@ -1344,15 +1344,21 @@ basin::tui() { # display DB items using a text-based user interface
     tput rmcup
   }
 
+  local previous_last_checked
+
   tui_display() { # generate the output for the interactive menu
-    tput clear
+
+    stty echo
 
     database::load
     local last_checked
     last_checked=$(cat ${DATABASE_FILE} | jq -r '.lastcheck // 0')
     if [[ ${last_checked} -eq 0 ]]; then
+      tput clear
       error "Database is stale. Try updating with: basin check"
-    else
+    # if last_checked and previous_last_checked are the same, don't repaint (no new information)
+    elif [[ ${last_checked} -ne ${previous_last_checked} ]]; then
+      tput clear
       # print the header
       echo -n "Streams currently live: (last checked at "
       system_date "${last_checked}"
@@ -1362,6 +1368,9 @@ basin::tui() { # display DB items using a text-based user interface
       database::print_formatted interactive
       echo
     fi
+    previous_last_checked=${last_checked}
+
+    stty -echo
   }
 
   preflight
@@ -1388,7 +1397,7 @@ basin::tui() { # display DB items using a text-based user interface
         break
         ;;
       [1-9])
-        local streams url
+        local streams url=
         IFS=$'\n' streams=($(cat "${DATABASE_FILE}" | jq -c '(.online // [])[]'))
         local i=0
         for stream in "${streams[@]}"; do
@@ -1398,17 +1407,21 @@ basin::tui() { # display DB items using a text-based user interface
             break
           fi
         done
-        $(config::get .browser) ${url} > /dev/null &
-        tui_display
-        echo "Started browser"
+        if [[ -n "${url}" ]]; then
+          $(config::get .browser) ${url} > /dev/null &
+          tui_display
+          echo "Started browser"
+          # hack: force repaint next cycle to remove the "Started browser" message again
+          previous_last_checked=$((previous_last_checked-1))
+        fi
         ;;
     esac
 
     # we need some kind of timeout so we don't waste cpu time
-    sleep 0.4
-    # make sure to only update every ten seconds
+    sleep 0.2
+    # make sure to only update every second
     ((i+=1))
-    if [[ ${i} -eq 25 ]]; then
+    if [[ ${i} -eq 5 ]]; then
       # output our stuff
       tui_display
       i=0
