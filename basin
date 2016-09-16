@@ -663,7 +663,7 @@ service::twitch() { # https://www.twitch.tv/
   # fetch the json for all followed channels
   local returned_data
   returned_data="$(curl -s \
-    --header 'Client-ID: '${CLIENT} \
+    --header 'Client-ID: '${twitch_client_id} \
     -H 'Accept: application/vnd.twitchtv.v3+json' \
     -X GET "https://api.twitch.tv/kraken/streams?channel=${url_list}&limit=100")"
 
