@@ -1197,8 +1197,10 @@ basin::search() {
 
   local returned_data_twitch returned_data_hitbox
   local enabled_twitch enabled_hitbox
+  local twitch_client_id
   enabled_twitch=$(config::get .search.twitch)
   enabled_hitbox=$(config::get .search.hitbox)
+  twitch_client_id="$(config::get .service.twitch.client_id)"
 
   if [[ "${enabled_hitbox}" != "true" && "${enabled_twitch}" != "true" ]]; then
     error 'No services are set to be searched. Please update your configuration.'
@@ -1210,7 +1212,7 @@ basin::search() {
     case ${type} in
       game)
         [[ "${enabled_twitch}" == "true" ]] && returned_data_twitch="$(curl -s \
-          --header 'Client-ID: '${CLIENT} \
+          --header 'Client-ID: '${twitch_client_id} \
           -H 'Accept: application/vnd.twitchtv.v3+json' \
           --data-urlencode "game=${arg}" \
           -G "https://api.twitch.tv/kraken/streams?limit=10")"
@@ -1220,7 +1222,7 @@ basin::search() {
         ;;
       status)
         [[ "${enabled_twitch}" == "true" ]] && returned_data_twitch="$(curl -s \
-          --header 'Client-ID: '${CLIENT} \
+          --header 'Client-ID: '${twitch_client_id} \
           -H 'Accept: application/vnd.twitchtv.v3+json' \
           --data-urlencode "query=\"${arg}\"" \
           -G "https://api.twitch.tv/kraken/search/streams?limit=10")"
