@@ -456,7 +456,10 @@ database::load() { # makes sure the DB file exists and is not too old
   check_file "${DATABASE_FILE}" "echo {}"
   # cleanup: if the database file is older than 2 hours, consider it outdated
   # and remove its contents
-  [[ -s "${DATABASE_FILE}" && $(($(date +%s)-$(cat "${DATABASE_FILE}" | jq -r '.lastcheck // 0'))) -gt 7200 ]] && database::reset
+  local date=$(date +%s)
+  local lastcheck=$(cat "${DATABASE_FILE}" | jq -r '.lastcheck // 0')
+  [[ -z "${lastcheck}" ]] && lastcheck=0
+  [[ -s "${DATABASE_FILE}" && $((${date}-${lastcheck})) -gt 7200 ]] && database::reset
 }
 database::get() { # get data from the database
   cat "${DATABASE_FILE}" \
@@ -643,7 +646,7 @@ service::twitch() { # https://www.twitch.tv/
   local twitch_list=${twitch_follow}
 
   # if user is set, fetch user's follow list and add them to the list
-  if [[ -n ${twitch_user} ]]; then 
+  if [[ -n ${twitch_user} ]]; then
     twitch_list="${twitch_list} \
       "$(curl -s \
       --header 'Client-ID: '${twitch_client_id} \
